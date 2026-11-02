@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Маяки в тумане · прототип</title>
+<style>
+:root{color-scheme:dark;--bg:#0c141e;--panel:#121f2b;--line:#2b3b48;--ink:#e8edf0;--muted:#9caebb;--gold:#f5cb7d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,Segoe UI,sans-serif}main{max-width:1380px;padding:30px;margin:auto}header{display:flex;justify-content:space-between;align-items:center;gap:25px}h1{font-size:30px;letter-spacing:-1px;margin:0}h2{font-size:20px;margin:0 0 12px}p{margin:8px 0 14px}.eyebrow{color:var(--gold);font-size:11px;letter-spacing:2px;text-transform:uppercase}.muted,small{color:var(--muted)}.intro{max-width:860px;font-size:14px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0 16px}.stat,.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}.stat strong{font-size:25px;display:block;font-weight:550}.stat small{display:block}.layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px}.map-panel{padding:0;overflow:hidden;position:relative}.map-title{padding:18px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);gap:12px}svg{display:block;width:100%;height:auto;background:#101d29}.map-footer{padding:15px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}button{font:inherit;border:1px solid #45515a;background:#213340;color:var(--ink);border-radius:7px;padding:10px 13px;cursor:pointer}button:hover:not(:disabled){border-color:var(--gold);background:#2d3e48}button:disabled{opacity:.42;cursor:default}.primary{background:var(--gold);color:#17202a;border-color:var(--gold);font-weight:650}.primary:hover:not(:disabled){background:#ffe0a1}.wide{width:100%;margin-top:9px}.controls{display:flex;gap:7px;align-items:center}.controls button{padding:6px 11px}.selected-button{border-color:var(--gold);color:var(--gold)}.status{font-size:13px;color:var(--gold);margin:10px 0}.detail{display:flex;justify-content:space-between;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line)}.section{margin-top:24px}.log{font-size:13px;color:var(--muted);min-height:68px}.log p{margin:6px 0}.goal{padding:14px 18px;border:1px solid #7d6b48;border-radius:10px;margin-top:16px;background:#29281f}.goal strong{color:var(--gold)}details{margin-top:20px}summary{cursor:pointer;color:var(--muted)}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.lab{padding:16px;background:var(--panel);border-radius:10px}.steps{display:flex;gap:8px;flex-wrap:wrap}.node{cursor:pointer;outline:none}.node:focus .island{stroke:white;stroke-width:3}.node text{pointer-events:none}.node:hover .island{stroke:var(--gold)}.win{color:var(--gold)}footer{font-size:12px;color:var(--muted);padding-top:24px} @media(max-width:950px){main{padding:16px}.layout{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start;flex-direction:column}.map-title{font-size:12px}h1{font-size:26px}}
+</style>
+<main>
+<header><div><div class="eyebrow">Эксперимент 01 · короткая игра об автоматизации</div><h1>Маяки в тумане</h1></div><div class="controls"><button id="pause">Пауза</button><button id="speed">Скорость ×1</button><button id="reset">Сначала</button></div></header>
+<p class="intro muted">Верни свет затопленному побережью. Проверяем идею: интересно ли выбирать между добычей, мощностью генератора и продвижением в туман? Это ранний прототип с временной графикой и балансом.</p>
+<div class="stats"><div class="stat"><small>Сплав</small><strong id="metal"></strong><small id="metalRate"></small></div><div class="stat"><small>Линзы</small><strong id="glass"></strong><small id="glassRate"></small></div><div class="stat"><small>Мощность сети</small><strong id="power"></strong><small id="powerNote"></small></div><div class="stat"><small>Состояние тумана</small><strong id="weather"></strong><small id="countdown"></small></div></div>
+<div class="layout"><div><div class="panel map-panel"><div class="map-title"><span>СЕКТОР 07 / ЗАТОПЛЕННЫЙ БЕРЕГ</span><span id="network"></span></div><svg id="map" viewBox="0 0 960 540" aria-label="Карта сети маяков"></svg><div class="map-footer">Нажми на остров, чтобы построить или отключить маяк. Золотые линии — действующая связь. Пунктир — доступное расширение.</div></div><div class="goal" id="goal"></div></div>
+<aside class="panel"><div class="eyebrow">Выбранная станция</div><h2 id="nodeName"></h2><p class="muted" id="nodeDesc"></p><div id="nodeDetails"></div><p class="status" id="nodeStatus"></p><button class="primary wide" id="build"></button><button class="wide" id="toggle"></button><div class="section"><h2>Развитие сети</h2><button class="wide" id="generator"></button><small>+3 мощности. Помогает пережить прилив.</small><button class="wide" id="drones"></button><small>+35% базовой добычи на каждой станции.</small></div><div class="section"><div class="eyebrow">Радиожурнал</div><div class="log" id="log"></div></div></aside></div>
+<details><summary>Лаборатория прототипа · пошаговые ситуации</summary><div class="lab"><p class="muted">Выбор ситуации сбрасывает карту и ставит время на паузу. Кнопки выполняют настоящие действия игры. После сценария можно продолжить вручную.</p><div class="tabs" id="tabs"></div><p id="scenarioDesc"></p><div class="steps" id="steps"></div><p id="scenarioResult" class="status"></p></div></details>
+<footer>Самостоятельный прототип · без сохранений · полный замысел находится в CONCEPT.md. Цифры и длительность прохождения ещё предстоит проверить.</footer>
+</main>
+<script id="game-logic">
+// Pure rules module. No browser state or rendering dependencies.
+const Game=(()=>{
+const nodes=[
+{id:0,x:120,y:270,name:'Аварийная станция',desc:'Последний работающий генератор. Даёт сплав даже при отключённой сети.',kind:'base',cost:[0,0]},
+{id:1,x:285,y:210,name:'Ржавый причал',desc:'Сборщики разбирают старые суда. Хорошее место для первой станции.',kind:'metal',cost:[20,0]},
+{id:2,x:275,y:390,name:'Стеклянная отмель',desc:'Под водой сохранились сигнальные линзы. Они нужны для улучшений.',kind:'glass',cost:[24,0]},
+{id:3,x:455,y:150,name:'Сухой док',desc:'За стальными воротами лежит нетронутый запас металла.',kind:'metal',cost:[32,4]},
+{id:4,x:480,y:310,name:'Звонница',desc:'В тумане иногда слышен колокол. Здесь можно собрать дополнительные линзы.',kind:'glass',cost:[38,6]},
+{id:5,x:650,y:135,name:'Молчаливый архив',desc:'В журнале хранителя одна строка: «Пока виден берег, мы вернёмся».',kind:'metal',cost:[48,10]},
+{id:6,x:655,y:385,name:'Дальний ретранслятор',desc:'Ещё один путь к главной башне. Линзы пригодятся для её запуска.',kind:'glass',cost:[48,10]},
+{id:7,x:820,y:265,name:'Береговой маяк',desc:'Его луч пробьёт пелену над всем побережьем. Доведи сюда питание и зажги огонь.',kind:'goal',cost:[120,40]}];
+const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const initial=()=>({metal:26,glass:0,generator:0,drones:0,time:0,stormOverride:null,built:[0],disabled:[],won:false,logs:['Аварийный огонь включён. Выберите ближайший остров.']});
+function network(s){
+ const storm=s.stormOverride??(s.time%85>=65),capacity=4+s.generator*3,unit=storm?1.6:1;
+ const active=[0],links=[],pending=s.built.filter(id=>id!==0&&!s.disabled.includes(id)).sort((a,b)=>distance(nodes[0],nodes[a])-distance(nodes[0],nodes[b]));let load=0,progress=true;
+ while(progress){progress=false;for(let i=0;i<pending.length;i++){const id=pending[i],parent=active.find(p=>distance(nodes[p],nodes[id])<=225),cost=nodes[id].kind==='goal'?3:unit;
+ if(parent!==undefined&&load+cost<=capacity+1e-8){active.push(id);links.push([parent,id]);load+=cost;pending.splice(i--,1);progress=true;}}}
+ const demand=s.built.filter(id=>id!==0&&!s.disabled.includes(id)).reduce((n,id)=>n+(nodes[id].kind==='goal'?3:unit),0);
+ const reachable=nodes.map(n=>active.some(id=>distance(nodes[id],n)<=225));
+ const visible=nodes.map(n=>s.built.includes(n.id)||active.some(id=>distance(nodes[id],n)<=310));
+ const multiplier=1+s.drones*.35;
+ return {storm,capacity,load,demand,active,links,reachable,visible,metalRate:.8+active.filter(id=>nodes[id].kind==='metal').length*2*multiplier,glassRate:active.filter(id=>nodes[id].kind==='glass').length*.65*multiplier};
+}
+const generatorCost=s=>[35+s.generator*25,8+s.generator*5];
+const droneCost=s=>[25+s.drones*20,4+s.drones*4];
+const afford=(s,cost)=>s.metal>=cost[0]&&s.glass>=cost[1];
+function act(source,action){
+ const s={...source,built:[...source.built],disabled:[...source.disabled],logs:[...source.logs]},net=network(s);
+ const say=t=>{s.logs=[t,...s.logs].slice(0,3);};const pay=c=>{s.metal-=c[0];s.glass-=c[1];};
+ if(action.type==='tick'&&!s.won){s.metal+=net.metalRate*action.dt;s.glass+=net.glassRate*action.dt;s.time+=action.dt;}
+ if(action.type==='build'){
+ const n=nodes[action.id];if(!n||s.built.includes(n.id))return s;
+ if(!net.reachable[n.id]){say('Слишком далеко: нужен действующий маяк ближе к острову.');return s;}
+ if(!afford(s,n.cost)){say('Для строительства пока недостаточно ресурсов.');return s;}
+ pay(n.cost);s.built.push(n.id);say(n.kind==='goal'?'Главная башня готова. Для огня ей нужны 3 мощности.':n.name+': маяк построен.');
+ }
+ if(action.type==='toggle'&&action.id!==0&&s.built.includes(action.id)){s.disabled=s.disabled.includes(action.id)?s.disabled.filter(id=>id!==action.id):[...s.disabled,action.id];say(nodes[action.id].name+': '+(s.disabled.includes(action.id)?'питание отключено.':'питание включено.'));}
+ if(action.type==='generator'){const c=generatorCost(s);if(afford(s,c)){pay(c);s.generator++;say('Генератор усилен. Доступно ещё 3 мощности.');}}
+ if(action.type==='drones'){const c=droneCost(s);if(afford(s,c)){pay(c);s.drones++;say('Сборщики улучшены. Добыча на станциях увеличилась.');}}
+ if(action.type==='storm')s.stormOverride=action.value;
+ if(!s.won&&network(s).active.includes(7)){s.won=true;say('Береговой маяк зажжён. В тумане снова виден берег.');}
+ return s;
+}
+return {nodes,distance,initial,network,act,afford,generatorCost,droneCost};
+})();
+</script>
+<script>
+let state=Game.initial(),selected=1,paused=false,speed=1,scenario=-1,step=0;
+const $=id=>document.getElementById(id),fmt=n=>Number(n.toFixed(1)).toLocaleString('ru-RU'),price=c=>`${c[0]} сплава${c[1]?' · '+c[1]+' линз':''}`;
+function dispatch(action){state=Game.act(state,action);render();}
+function render(){
+ const net=Game.network(state),n=Game.nodes[selected],built=state.built.includes(selected),active=net.active.includes(selected),manualOff=state.disabled.includes(selected);
+ $('metal').textContent=Math.floor(state.metal).toLocaleString('ru-RU');$('glass').textContent=Math.floor(state.glass).toLocaleString('ru-RU');
+ $('metalRate').textContent='+'+fmt(net.metalRate)+' / сек';$('glassRate').textContent='+'+fmt(net.glassRate)+' / сек';
+ $('power').textContent=fmt(net.load)+' / '+net.capacity;$('powerNote').textContent=net.demand>net.capacity?'Перегрузка: требуется '+fmt(net.demand):'Запас: '+fmt(net.capacity-net.load)+' мощности';
+ $('weather').textContent=state.won?'Свет вернулся':net.storm?'Густой туман':'Тихий прилив';
+ $('countdown').textContent=state.won?'Цель достигнута':state.stormOverride!==null?'Погода задана сценарием':net.storm?'Ослабнет через '+Math.ceil(85-state.time%85)+' сек':'Усилится через '+Math.ceil(65-state.time%85)+' сек';
+ $('network').textContent=`${net.active.length} / ${state.built.length} станций работают`;
+ $('pause').textContent=paused?'Продолжить':'Пауза';$('speed').textContent='Скорость ×'+speed;
+ $('nodeName').textContent=n.name;$('nodeDesc').textContent=n.desc;
+ const production=n.kind==='metal'?fmt(2*(1+state.drones*.35))+' сплава / сек':n.kind==='glass'?fmt(.65*(1+state.drones*.35))+' линз / сек':n.kind==='base'?'0,8 сплава / сек':'Открывает побережье';
+ $('nodeDetails').innerHTML=`<div class="detail"><span>Добыча / назначение</span><span>${production}</span></div><div class="detail"><span>Потребление</span><span>${n.kind==='base'?'—':n.kind==='goal'?'3':fmt(net.storm?1.6:1)} мощности</span></div><div class="detail"><span>Дальность связи</span><span>225 м</span></div>`;
+ $('nodeStatus').textContent=built?(active?'Станция работает':manualOff?'Питание отключено вручную':net.demand>net.capacity?'Нет питания: перегрузка или разрыв цепочки':'Нет связи с работающим маяком'):net.reachable[selected]?'Сюда доходит сеть. Можно строить.':'Видна в тумане, но пока вне дальности связи.';
+ $('build').hidden=built;$('build').textContent=(n.kind==='goal'?'Зажечь маяк':'Построить маяк')+' · '+price(n.cost);$('build').disabled=!net.reachable[selected]||!Game.afford(state,n.cost)||state.won;
+ $('toggle').hidden=!built||selected===0;$('toggle').textContent=manualOff?'Включить питание':'Отключить питание';$('toggle').disabled=state.won;
+ $('generator').textContent=`Генератор ${state.generator+1} · ${price(Game.generatorCost(state))}`;$('generator').disabled=!Game.afford(state,Game.generatorCost(state))||state.won;
+ $('drones').textContent=`Сборщики ${state.drones+1} · ${price(Game.droneCost(state))}`;$('drones').disabled=!Game.afford(state,Game.droneCost(state))||state.won;
+ $('log').replaceChildren(...state.logs.map(t=>{const p=document.createElement('p');p.textContent=t;return p;}));
+ $('goal').innerHTML=state.won?'<strong>Берег снова виден.</strong> Ты зажёг главный маяк. Прототип завершён.':'<strong>Цель: зажечь Береговой маяк.</strong> Продвигайся вправо, собирай линзы и оставь 3 мощности для главной башни.';
+ draw(net);renderSteps();
+}
+function draw(net){
+ const all=Game.nodes;let svg=`<defs><pattern id="sea" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M8 30h18m22 0h6" stroke="#273747" stroke-width="1"/></pattern></defs><rect width="960" height="540" fill="url(#sea)"/>`;
+ for(const id of net.active){const n=all[id];svg+=`<circle cx="${n.x}" cy="${n.y}" r="${state.won?420:225}" fill="#f5cb7d" fill-opacity=".045" stroke="#f5cb7d" stroke-opacity=".12"/>`;}
+ for(let a=0;a<all.length;a++)for(let b=a+1;b<all.length;b++){if(!net.visible[a]||!net.visible[b]||Game.distance(all[a],all[b])>225)continue;const live=net.links.some(([x,y])=>x===a&&y===b||x===b&&y===a);if(!live&&!net.active.includes(a)&&!net.active.includes(b))continue;svg+=`<line x1="${all[a].x}" y1="${all[a].y}" x2="${all[b].x}" y2="${all[b].y}" stroke="${live?'#f5cb7d':'#63716f'}" stroke-opacity="${live?'.75':'.3'}" stroke-width="${live?2:1}" ${live?'':'stroke-dasharray="5 7"'}/>`;}
+ for(const n of all){if(!net.visible[n.id]&&!state.won)continue;const active=net.active.includes(n.id),built=state.built.includes(n.id),color=active?'#f5cb7d':built?'#8d98a3':'#6b8595';svg+=`<g class="node" role="button" tabindex="0" aria-label="${n.name}" data-id="${n.id}"><title>${n.name}</title>${selected===n.id?`<circle cx="${n.x}" cy="${n.y}" r="33" fill="none" stroke="#f5cb7d" stroke-dasharray="3 5"/>`:''}<path class="island" d="M${n.x-25} ${n.y+5}l10 -23 28 -2 16 19 -10 22 -31 1z" fill="#1e303a" stroke="${color}"/><path d="M${n.x-5} ${n.y+9}l2 -20h6l3 20z M${n.x-9} ${n.y-11}h18" fill="${color}" stroke="${color}"/><circle cx="${n.x}" cy="${n.y-15}" r="4" fill="${color}"/><text x="${n.x}" y="${n.y+48}" text-anchor="middle" fill="${active?'#e8dfcc':'#9caebb'}" font-family="system-ui" font-size="13">${n.name}</text><text x="${n.x}" y="${n.y+66}" text-anchor="middle" fill="#8296a4" font-family="system-ui" font-size="11">${n.kind==='metal'?'СПЛАВ':n.kind==='glass'?'ЛИНЗЫ':n.kind==='goal'?'ГЛАВНЫЙ ОГОНЬ':'ГЕНЕРАТОР'}</text></g>`;}
+ if(!state.won)svg+='<text x="828" y="62" text-anchor="middle" fill="#647b8b" font-family="system-ui" font-size="12" letter-spacing="3">НЕИЗВЕСТНЫЙ БЕРЕГ</text>';
+ $('map').innerHTML=svg;
+}
+$('map').addEventListener('click',e=>{const node=e.target.closest('[data-id]');if(node){selected=Number(node.dataset.id);render();}});
+$('map').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const node=e.target.closest('[data-id]');if(node){e.preventDefault();selected=Number(node.dataset.id);render();}}});
+$('build').onclick=()=>dispatch({type:'build',id:selected});$('toggle').onclick=()=>dispatch({type:'toggle',id:selected});$('generator').onclick=()=>dispatch({type:'generator'});$('drones').onclick=()=>dispatch({type:'drones'});
+$('pause').onclick=()=>{paused=!paused;render();};$('speed').onclick=()=>{speed=speed===1?3:speed===3?8:1;render();};
+$('reset').onclick=()=>{state=Game.initial();selected=1;paused=false;scenario=-1;step=0;$('scenarioDesc').textContent='';$('scenarioResult').textContent='';render();};
+const scenarios=[
+{name:'Первый свет',desc:'Построй причал, получи сплав и открой добычу линз. Следи за скоростью накопления.',setup:()=>Game.initial(),steps:[['Построить причал',{type:'build',id:1}],['30 секунд добычи',{type:'tick',dt:30}],['Построить отмель',{type:'build',id:2}]],result:'Обе станции добывают автоматически. Теперь можно выбирать между улучшениями и расширением.'},
+{name:'Туман возвращается',desc:'Четыре маяка используют всю мощность. Усиль туман и проверь, как отключается край сети.',setup:()=>({...Game.initial(),metal:100,glass:25,built:[0,1,2,3,4],stormOverride:false}),steps:[['Вызвать густой туман',{type:'storm',value:true}],['Усилить генератор',{type:'generator'}]],result:'Запаса мощности снова хватает. Построенные станции вернулись в работу без повторной покупки.'},
+{name:'Граница сети',desc:'Архив уже виден, но связь до него не доходит. Попробуй построить его, затем добавь промежуточный маяк.',setup:()=>({...Game.initial(),metal:200,glass:60,built:[0,1,2,4],generator:1,stormOverride:false}),steps:[['Попробовать построить архив',{type:'build',id:5}],['Построить сухой док',{type:'build',id:3}],['Построить архив',{type:'build',id:5}]],result:'Видимость и дальность связи различаются. Промежуточная станция открыла путь в архив.'}
+];
+$('tabs').replaceChildren(...scenarios.map((s,i)=>{const b=document.createElement('button');b.textContent=s.name;b.onclick=()=>{scenario=i;step=0;state=s.setup();paused=true;selected=i===0?1:i===1?4:5;$('scenarioDesc').textContent=s.desc;$('scenarioResult').textContent='';render();};return b;}));
+function renderSteps(){[...$('tabs').children].forEach((b,i)=>b.classList.toggle('selected-button',i===scenario));$('steps').replaceChildren();if(scenario<0)return;const s=scenarios[scenario];s.steps.forEach(([label,action],i)=>{const b=document.createElement('button');b.textContent=(i<step?'✓ ':`${i+1}. `)+label;b.disabled=i!==step;b.onclick=()=>{if(action.id!==undefined)selected=action.id;step++;dispatch(action);if(step===s.steps.length)$('scenarioResult').textContent=s.result;};$('steps').append(b);});}
+let last=performance.now(),acc=0;function frame(now){const dt=Math.min((now-last)/1000,.25);last=now;if(!paused&&!state.won){acc+=dt;if(acc>=.2){state=Game.act(state,{type:'tick',dt:acc*speed});acc=0;render();}}requestAnimationFrame(frame);}render();requestAnimationFrame(frame);
+</script>
+</html>
