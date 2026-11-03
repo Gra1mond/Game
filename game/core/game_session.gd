@@ -103,6 +103,19 @@ func dispatch(command: Dictionary) -> Dictionary:
 		_profile.revision += 1
 		_refresh_network()
 		return _result(true)
+	if kind == "upgrade" and command.get("id") == "quartz_lens":
+		var station_id: String = str(command.get("station", ""))
+		if not _profile.run.stations.has(station_id) or _profile.run.stations[station_id].kind != "quartz":
+			return _result(false, "unknown_station")
+		var station: Dictionary = _profile.run.stations[station_id]
+		if station.lens_level >= 1:
+			return _result(false, "max_level")
+		if _profile.run.wallet.quartz < ContentCatalog.QUARTZ_LENS_PRICE:
+			return _result(false, "insufficient_quartz")
+		_profile.run.wallet.quartz -= ContentCatalog.QUARTZ_LENS_PRICE
+		station.lens_level = 1
+		_profile.revision += 1
+		return _result(true)
 	if kind == "upgrade" and command.get("id") == "cargo_hold":
 		if not _profile.run.stations.has("port"):
 			return _result(false, "unknown_station")
@@ -128,11 +141,12 @@ func dispatch(command: Dictionary) -> Dictionary:
 		if typeof(command.get("enabled")) != TYPE_BOOL or typeof(command.get("target")) != TYPE_STRING:
 			return _result(false, "invalid_command")
 		var target: String = command.target
-		if target != "port" and (command.enabled or not target.is_empty()):
+		if target not in ["port", "quartz"] and (command.enabled or not target.is_empty()):
 			return _result(false, "unknown_boost_target")
-		if command.enabled and not _profile.run.stations.has("port"):
+		if command.enabled and ((target == "port" and not _profile.run.stations.has("port")) or (target == "quartz" and ContentCatalog.quartz_count(_profile.run) == 0)):
 			return _result(false, "unknown_station")
 		if _profile.run.oil_boost_target != target or _profile.run.oil_boost_enabled != command.enabled:
+			_boost_active = false
 			_profile.run.oil_boost_target = target
 			_profile.run.oil_boost_enabled = command.enabled
 			_profile.revision += 1
@@ -173,9 +187,11 @@ func dispatch(command: Dictionary) -> Dictionary:
 				station.cycle_mode = ""
 			_profile.revision += 1
 		return _result(true)
-	if kind == "build" and ContentCatalog.STATION_PRICES.has(command.get("kind")):
+	if kind == "build" and (ContentCatalog.STATION_PRICES.has(command.get("kind")) or command.get("kind") == "quartz"):
 		var region: String = command.kind
-		if _profile.run.stations.has(region):
+		if region == "quartz" and not QuartzRules.unlocked(_profile.run):
+			return _result(false, "quartz_locked")
+		if region != "quartz" and _profile.run.stations.has(region):
 			return _result(false, "already_built")
 		var price: float = ContentCatalog.station_price(_profile.run, region)
 		if _profile.run.wallet.alloy < price:
@@ -187,9 +203,10 @@ func dispatch(command: Dictionary) -> Dictionary:
 		_profile.run.wallet.alloy -= price
 		if not _profile.run.relays.has(region):
 			_profile.run.relays[region] = RunState.create_relay()
+		var station_id: String = "quartz_%d" % (ContentCatalog.quartz_count(_profile.run) + 1) if region == "quartz" else region
 		var station: Dictionary = {
-			"id": region, "kind": region, "region": region, "enabled": true,
-			"power_request": ContentCatalog.PORT_POWER if region == "port" else ContentCatalog.OIL_POWER, "priority": 0,
+			"id": station_id, "kind": region, "region": region, "enabled": true,
+			"power_request": ContentCatalog.QUARTZ_POWER if region == "quartz" else (ContentCatalog.PORT_POWER if region == "port" else ContentCatalog.OIL_POWER), "priority": 0,
 		}
 		if region == "oil":
 			station.phase = "pressure"
@@ -197,7 +214,12 @@ func dispatch(command: Dictionary) -> Dictionary:
 			station.mode = "steady"
 			station.cycle_mode = ""
 			station.heat = 0.0
-		_profile.run.stations[region] = station
+		if region == "quartz":
+			station.phase = "charge"
+			station.phase_progress = 0.0
+			station.lens_level = 0
+			station.cycle_lens_level = -1
+		_profile.run.stations[station_id] = station
 		_profile.revision += 1
 		_refresh_network()
 		return _result(true)
@@ -212,12 +234,12 @@ func dispatch(command: Dictionary) -> Dictionary:
 		if not ContentCatalog.PORT_ROUTES.has(target):
 			return _result(false, "unknown_target")
 		var worker: Dictionary = _profile.run.workers[worker_id]
-		if station_id == "oil":
+		if station_id != "port":
 			for other_id: String in _profile.run.workers:
 				var other: Dictionary = _profile.run.workers[other_id]
-				if other_id != worker_id and (other.assignment == "oil" or other.queued_assignment == "oil"):
+				if other_id != worker_id and (other.assignment == station_id or other.queued_assignment == station_id):
 					return _result(false, "station_full")
-			if worker.assignment == "oil":
+			if worker.assignment == station_id:
 				return _result(false, "already_assigned")
 		if worker.assignment == "port":
 			if (not worker.recall_pending and station_id == "port" and worker.target == target) or (worker.recall_pending and worker.queued_assignment == station_id and worker.queued_target == target):
@@ -228,7 +250,7 @@ func dispatch(command: Dictionary) -> Dictionary:
 		else:
 			worker.assignment = station_id
 			worker.target = target
-			worker.phase = "operating" if station_id == "oil" else "outbound"
+			worker.phase = "outbound" if station_id == "port" else "operating"
 			worker.phase_progress = 0.0
 			worker.recall_pending = false
 			worker.queued_assignment = ""
@@ -269,9 +291,16 @@ func advance(seconds: float) -> void:
 		var oil: float = OilRules.advance(_profile.run, ContentCatalog.STEP, oil_powered)
 		if oil > 0.0:
 			_produce("oil", oil)
+		for id: String in _profile.run.stations:
+			var station: Dictionary = _profile.run.stations[id]
+			if station.kind == "quartz":
+				var power: float = _network.consumers[id].power
+				var quartz: float = QuartzRules.advance(_profile.run, station, ContentCatalog.STEP, power, ContentCatalog.OIL_BOOST_BONUS if _boost_active and _profile.run.oil_boost_target == "quartz" else 0.0)
+				if quartz > 0.0:
+					_produce("quartz", quartz)
 		var deliveries := 0.0
 		if _network.consumers.has("port") and _network.consumers.port.active:
-			deliveries = PortRules.advance(_profile.run, ContentCatalog.STEP, ContentCatalog.OIL_BOOST_BONUS if _boost_active else 0.0)
+			deliveries = PortRules.advance(_profile.run, ContentCatalog.STEP, ContentCatalog.OIL_BOOST_BONUS if _boost_active and _profile.run.oil_boost_target == "port" else 0.0)
 		if deliveries > 0.0:
 			_produce("alloy", deliveries)
 		_profile.revision += 1
@@ -279,7 +308,7 @@ func advance(seconds: float) -> void:
 func snapshot() -> Dictionary:
 	var result: Dictionary = _profile.duplicate(true)
 	result["paused"] = _paused
-	var oil_bonus: float = ContentCatalog.OIL_BOOST_BONUS if _boost_active else 0.0
+	var oil_bonus: float = ContentCatalog.OIL_BOOST_BONUS if _boost_active and _profile.run.oil_boost_target == "port" else 0.0
 	result["derived"] = PortRules.describe(_profile.run, oil_bonus)
 	var derived: Dictionary = result.derived
 	derived.regions = _network.regions.duplicate(true)
@@ -304,10 +333,6 @@ func snapshot() -> Dictionary:
 			derived.stations.port.rate = 0.0
 	derived.stations.oil = OilRules.describe(_profile.run, _network.consumers.get("oil", {}))
 	derived.prices.oil = {"alloy": ContentCatalog.station_price(_profile.run, "oil")}
-	for id: String in _profile.run.workers:
-		if _profile.run.workers[id].assignment == "oil":
-			derived.workers[id].progress = derived.stations.oil.progress
-			derived.workers[id].phase_seconds = derived.stations.oil.phase_seconds
 	var targets: Array[String] = []
 	for region: String in ContentCatalog.BEAM_TARGETS:
 		if derived.regions[region].discovered:
@@ -352,10 +377,11 @@ func snapshot() -> Dictionary:
 	var beam_speed: float = ContentCatalog.PORT_BEAM_LOADING_SPEED if lit else 1.0
 	for route: String in ContentCatalog.PORT_ROUTES:
 		boost_routes[route] = {
-			"off": derived.routes[route] if not _boost_active else PortRules.route_details(route, derived.capacity, beam_speed),
-			"on": derived.routes[route] if _boost_active else PortRules.route_details(route, derived.capacity, beam_speed + ContentCatalog.OIL_BOOST_BONUS),
+			"off": derived.routes[route] if oil_bonus == 0.0 else PortRules.route_details(route, derived.capacity, beam_speed),
+			"on": derived.routes[route] if oil_bonus > 0.0 else PortRules.route_details(route, derived.capacity, beam_speed + ContentCatalog.OIL_BOOST_BONUS),
 		}
 	derived.oil_boost.port_routes = boost_routes
+	_describe_quartz(derived)
 	derived.oil_production = derived.stations.oil.rate
 	derived.oil_consumption = derived.generator.consumption + derived.oil_boost.consumption
 	derived.oil_net = derived.oil_production - derived.oil_consumption
@@ -376,13 +402,20 @@ func _reserve_boost() -> void:
 	_boost_active = false
 	if not _profile.run.oil_boost_enabled:
 		return
-	if not _network.consumers.has("port") or not _network.consumers.port.active:
+	var target: String = _profile.run.oil_boost_target
+	var powered := false
+	for id: String in _network.consumers:
+		var consumer: Dictionary = _network.consumers[id]
+		if consumer.kind == "station" and consumer.region == target and consumer.active:
+			powered = true
+			break
+	if not powered:
 		_boost_reason = "no_power"
 		return
 	var working := false
 	for id: String in _profile.run.workers:
 		var worker: Dictionary = _profile.run.workers[id]
-		if worker.assignment == "port" and not worker.recall_pending:
+		if not worker.recall_pending and _profile.run.stations.has(worker.assignment) and _profile.run.stations[worker.assignment].region == target and _network.consumers[worker.assignment].active:
 			working = true
 			break
 	if not working:
@@ -407,3 +440,48 @@ func _produce(id: String, amount: float) -> void:
 
 func _result(accepted: bool, reason: String = "ok") -> Dictionary:
 	return {"accepted": accepted, "reason_code": reason, "events": []}
+
+func _describe_quartz(derived: Dictionary) -> void:
+	var run: Dictionary = _profile.run
+	var ids: Array[String] = []
+	var requirements: Dictionary = {}
+	for resource: String in ContentCatalog.QUARTZ_UNLOCK_PRODUCTION:
+		requirements[resource] = {"produced": run.lifetime_produced[resource], "required": ContentCatalog.QUARTZ_UNLOCK_PRODUCTION[resource]}
+	var unlocked: bool = QuartzRules.unlocked(run)
+	derived.quartz = {
+		"unlocked": unlocked, "reason": "ready" if unlocked else "quartz_locked",
+		"required_stations": {"port": run.stations.has("port"), "oil": run.stations.has("oil")},
+		"requirements": requirements, "station_ids": ids, "next_id": "", "rate": 0.0,
+	}
+	derived.prices.quartz = {"alloy": ContentCatalog.station_price(run, "quartz")}
+	derived.prices.quartz_lens = {"quartz": ContentCatalog.QUARTZ_LENS_PRICE}
+	derived.beam.quartz_drills = {}
+	derived.oil_boost.quartz_drills = {}
+	var lit: bool = run.beam_target == "quartz"
+	var bonus: float = ContentCatalog.OIL_BOOST_BONUS if _boost_active and run.oil_boost_target == "quartz" else 0.0
+	for id: String in run.stations:
+		var station: Dictionary = run.stations[id]
+		if station.kind != "quartz":
+			continue
+		ids.append(id)
+		var details: Dictionary = QuartzRules.describe(run, station, _network.consumers[id], bonus)
+		derived.stations[id] = details
+		derived.quartz.rate += float(details.rate)
+		if lit and details.active:
+			derived.beam.active = true
+		var base: Dictionary = QuartzRules.cycle_details(station.lens_level, details.forecast_power, false, bonus)
+		var illuminated: Dictionary = QuartzRules.cycle_details(station.lens_level, details.forecast_power, true, bonus)
+		derived.beam.quartz_drills[id] = {"base": base, "lit": illuminated}
+		var current: Dictionary = illuminated if lit else base
+		derived.oil_boost.quartz_drills[id] = {
+			"off": current if bonus == 0.0 else QuartzRules.cycle_details(station.lens_level, details.forecast_power, lit, 0.0),
+			"on": current if bonus > 0.0 else QuartzRules.cycle_details(station.lens_level, details.forecast_power, lit, ContentCatalog.OIL_BOOST_BONUS),
+		}
+	derived.quartz.next_id = "quartz_%d" % (ids.size() + 1)
+	if not ids.is_empty():
+		derived.oil_boost.targets.append("quartz")
+	for id: String in run.workers:
+		var assignment: String = run.workers[id].assignment
+		if assignment != "port" and derived.stations.has(assignment):
+			derived.workers[id].progress = derived.stations[assignment].progress
+			derived.workers[id].phase_seconds = derived.stations[assignment].phase_seconds

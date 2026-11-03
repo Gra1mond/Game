@@ -7,7 +7,7 @@
 | SaveEnvelope | schema_version, content_version, revision, profile_id | Файл целиком |
 | ProfileState | total_echo, allocation, claimed_milestone_ids, discovered_locations, story_flags, cycle_index | Между экспедициями |
 | RunState | run_id, seed, tick, wallet, lifetime_produced, stations, relays, workers, upgrades, goals, finds, project_stages, beam_target, generator_built, generator_enabled, oil_boost_target, oil_boost_enabled | Текущий цикл |
-| StationState | id, kind, region, enabled, power_request, priority; mode, cycle_mode, phase, phase_progress, heat для oil | Текущий цикл |
+| StationState | id, kind, region, enabled, power_request, priority; mode/cycle_mode/phase/phase_progress/heat для oil; phase/phase_progress/lens_level/cycle_lens_level для quartz | Текущий цикл |
 | WorkerState | id, assignment, target, phase, phase_progress, cargo, recall_pending, queued_assignment, queued_target; expedition_target по мере появления находок | Текущий цикл |
 | Settings | volume, text_scale, effects, input_settings, automation_preferences | Отдельно от игрового профиля |
 
@@ -26,6 +26,10 @@ T05: `run.beam_target` действует: default `""`, открытые port/o
 T06: `stations.oil` появляется после покупки: id/kind/region=oil, enabled=true, power_request=0.75,priority=0, mode=steady, cycle_mode="", phase=pressure, phase_progress=0,heat=0. Фазы pressure/pumping/cooling; `cycle_mode` фиксирует уже начатую партию, `mode` — следующий выбор. Давление хранит базовую работу, откачка/охлаждение — секунды. Выпуск зачисляется только при завершении откачки, промежуточная партия не хранится вторым ресурсом. Назначение насоса — `workers[id].assignment="oil",phase="operating"`; очередь использует существующие queued_assignment/queued_target. target остаётся допустимым near/far и на насосе.
 
 `generator_built/generator_enabled` по умолчанию false; `oil_boost_target=""`, `oil_boost_enabled=false`. В T10 эти флаги, тепло, работа и зафиксированный режим партии восстанавливаются вместе с рабочими, без повторной покупки/выплаты. Фактические `_generator_active/_boost_active`, причина форсажа, сетевой кэш и все derived — пересчитываемые runtime-данные, не дополнительные сохраняемые флаги. Топливо резервируется реальным шагом, не snapshot/загрузкой. Файловые сохранения пока не реализованы.
+
+T07: буры `quartz_1`, `quartz_2`, … имеют kind/region=quartz, enabled=true,power_request=1,priority=0,phase=charge,phase_progress=0,lens_level=0,cycle_lens_level=-1. Удаления буров нет; следующий ID определяется числом построенных. `cycle_lens_level=-1` означает ещё не начатый заряд; первая реальная работа фиксирует0/1 из установленной линзы, следующий заряд фиксирует её заново. Работа charge — базовые секунды выбранной линзы; fracture/cooling — реальные секунды. Все фазы сохраняются при отсутствии рабочего/питания.
+
+В T10 восстановить станционные фазы/работу/установленную и зафиксированную линзу вместе с assignment/queued_assignment конкретных буров. Не превращать завершённый скол в повторную выплату и не заменять сохранённый старый заряд новой линзой. Порог открытия вычисляется из сохранённых станций/lifetime_produced, не хранится вторым флагом. oil_boost_target допускает quartz, но runtime active/предпросмотры/выбор бура в UI не сериализуются. Проверка файлового восстановления остаётся будущей T10.
 
 ### Планируемое расширение M2
 

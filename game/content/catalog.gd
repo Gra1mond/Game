@@ -24,6 +24,17 @@ const GENERATOR_CAPACITY: float = 2.0
 const GENERATOR_OIL_PER_SECOND: float = 0.5
 const OIL_BOOST_PER_SECOND: float = 0.5
 const OIL_BOOST_BONUS: float = 0.5
+const QUARTZ_DRILL_PRICE: float = 20.0
+const QUARTZ_PRICE_GROWTH: float = 1.5
+const QUARTZ_POWER: float = 1.0
+const QUARTZ_CHARGE_SECONDS: float = 8.0
+const QUARTZ_FRACTURE_SECONDS: float = 1.0
+const QUARTZ_COOLING_SECONDS: float = 4.0
+const QUARTZ_BATCH: float = 4.0
+const QUARTZ_UNLOCK_PRODUCTION: Dictionary = {"alloy": 8.0, "oil": 8.0}
+const QUARTZ_BEAM_CHARGE_SPEED: float = 2.0
+const QUARTZ_LENS_PRICE: float = 4.0
+const QUARTZ_LENS_CHARGE_SECONDS: float = 6.0
 const WORKER_CAPACITY: float = 4.0
 const PORT_ROUTES: Dictionary = {
 	"near": {"name": "Ближний обломок", "travel_seconds": 2.0, "loading_seconds": 1.0, "cargo_limit": 4.0},
@@ -57,7 +68,16 @@ const REGIONS: Dictionary = {
 const RELAY_PRICES: Dictionary = {"port": 10.0, "oil": 10.0, "quartz": 12.0, "coastal": 16.0}
 
 static func station_price(run: Dictionary, region: String) -> float:
+	if region == "quartz":
+		return ceilf(QUARTZ_DRILL_PRICE * pow(QUARTZ_PRICE_GROWTH, quartz_count(run))) + (0.0 if run.relays.has("quartz") else float(RELAY_PRICES.quartz))
 	return float(STATION_PRICES[region]) - (float(RELAY_PRICES[region]) if run.relays.has(region) else 0.0)
 
 static func worker_price(worker_count: int) -> float:
 	return ceilf(WORKER_BASE_PRICE * pow(WORKER_PRICE_GROWTH, maxi(0, worker_count - 1)))
+
+static func quartz_count(run: Dictionary) -> int:
+	var count := 0
+	for id: String in run.stations:
+		if run.stations[id].kind == "quartz":
+			count += 1
+	return count
