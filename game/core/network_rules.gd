@@ -16,7 +16,12 @@ static func evaluate(run: Dictionary, discovered: Array, capacity: float = Conte
 	for id: String in stations:
 		var station: Dictionary = stations[id]
 		var region: String = station.get("region", id)
-		consumers[id] = _consumer(id, "station", region, station, ContentCatalog.OIL_POWER if station.kind == "oil" else ContentCatalog.PORT_POWER, 0)
+		var minimum: float = ContentCatalog.PORT_POWER
+		if station.kind == "oil":
+			minimum = ContentCatalog.OIL_POWER
+		elif station.kind == "quartz":
+			minimum = ContentCatalog.QUARTZ_POWER
+		consumers[id] = _consumer(id, "station", region, station, minimum, 0)
 
 	var consumer_ids: Array[String] = []
 	for id: String in consumers:

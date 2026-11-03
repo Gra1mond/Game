@@ -30,7 +30,7 @@ static func advance(run: Dictionary, delta: float, oil_bonus: float) -> float:
 				if worker.recall_pending:
 					worker.assignment = worker.queued_assignment
 					worker.target = worker.queued_target
-					worker.phase = "idle" if worker.assignment.is_empty() else ("operating" if worker.assignment == "oil" else "outbound")
+					worker.phase = "idle" if worker.assignment.is_empty() else ("outbound" if worker.assignment == "port" else "operating")
 					worker.phase_progress = 0.0
 					worker.recall_pending = false
 					worker.queued_assignment = ""
