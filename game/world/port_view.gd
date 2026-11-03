@@ -46,7 +46,7 @@ func _draw() -> void:
 		draw_colored_polygon(hull, Color("647d87"))
 		draw_line(destination + Vector2(-8, -13), destination + Vector2(-8, -33), MUTED, 3.0)
 		draw_string(font, destination + Vector2(-80, 37), route.name, HORIZONTAL_ALIGNMENT_CENTER, 160, 15, INK)
-		draw_string(font, destination + Vector2(-80, 58), "%.0f груза · %.0f с · %.2f/с" % [route.cargo, route.cycle_seconds, route.rate], HORIZONTAL_ALIGNMENT_CENTER, 160, 13, MUTED)
+		draw_string(font, destination + Vector2(-80, 58), "%.0f груза · %.1f с · %.2f/с" % [route.cargo, route.cycle_seconds, route.rate], HORIZONTAL_ALIGNMENT_CENTER, 160, 13, MUTED)
 	var built: bool = _state.run.stations.has("port")
 	draw_rect(Rect2(home - Vector2(35, 20), Vector2(56, 44)), Color("38515c") if built else Color("253845"))
 	for offset: int in [-24, -4, 16]:
@@ -60,7 +60,7 @@ func _draw() -> void:
 		if worker.assignment != "port":
 			continue
 		var details: Dictionary = _state.derived.workers[id]
-		var progress: float = clampf((float(worker.phase_progress) + (0.0 if _state.paused or not _physically_powered() else _render_elapsed)) / float(details.phase_seconds), 0.0, 1.0)
+		var progress: float = clampf(float(details.progress) + (0.0 if _state.paused or not _physically_powered() else _render_elapsed / float(details.phase_seconds)), 0.0, 1.0)
 		var destination := _target(worker.target) + lane
 		var position_on_route := destination
 		if worker.phase == "outbound":
