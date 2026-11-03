@@ -2,7 +2,7 @@
 
 Godot 4.7.2 stable (`4.7.2.stable.official.ed1daf0bf`), типизированный GDScript, 2D Compatibility. Целевая платформа — Windows x64. Исходный HTML остаётся отдельным экспериментом.
 
-**Реализовано: T01–T07.** T01–T06 и спецификация PR #3 приняты в `dev`; T07 проверен в `feat/T07-quartz` и готовится к отдельному PR/подтверждению перед T08. 3D-модели/карточки и герои M2 остаются планом. [План](docs/implementation-plan/README.md), [графика](docs/implementation-plan/ART-AND-ASSETS.md), [прогрессия](docs/implementation-plan/CREW-AND-TALENTS.md), [навыки](docs/implementation-plan/SKILLS-RESEARCH.md).
+**Реализовано: T01–T07.** T01–T06 и спецификация PR #3 приняты в `dev`; [PR #6 — T07](https://github.com/Gra1mond/Game/pull/6) проверен и ждёт подтверждения перед T08. 3D-модели/карточки и герои M2 остаются планом. [План](docs/implementation-plan/README.md), [графика](docs/implementation-plan/ART-AND-ASSETS.md), [прогрессия](docs/implementation-plan/CREW-AND-TALENTS.md), [навыки](docs/implementation-plan/SKILLS-RESEARCH.md).
 
 ## Установка и запуск
 
