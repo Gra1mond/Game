@@ -1,6 +1,7 @@
 extends Control
 
 signal region_selected(region: String)
+signal beam_requested(region: String)
 
 const INK := Color("e8edf0")
 const MUTED := Color("9caebb")
@@ -101,6 +102,16 @@ func _gui_input(event: InputEvent) -> void:
 	if _state.is_empty():
 		return
 	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			grab_focus()
+			for id: String in _state.derived.beam.targets:
+				if event.position.distance_to(region_screen_position(id)) <= 35.0:
+					select_region(id)
+					region_selected.emit(id)
+					beam_requested.emit(id)
+					break
+			accept_event()
+			return
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			change_zoom(1.2)
 			accept_event()
@@ -136,6 +147,9 @@ func _gui_input(event: InputEvent) -> void:
 			KEY_PLUS, KEY_EQUAL, KEY_KP_ADD: change_zoom(1.2)
 			KEY_MINUS, KEY_KP_SUBTRACT: change_zoom(1.0 / 1.2)
 			KEY_HOME: reset_view()
+			KEY_ENTER, KEY_KP_ENTER:
+				if _state.derived.beam.targets.has(_selected):
+					beam_requested.emit(_selected)
 			_: return
 		accept_event()
 
@@ -144,6 +158,15 @@ func _draw() -> void:
 	if _state.is_empty():
 		return
 	var font := ThemeDB.fallback_font
+	var beam_target: String = _state.derived.beam.target
+	if not beam_target.is_empty():
+		var origin := region_screen_position("ship")
+		var destination := region_screen_position(beam_target)
+		var direction := destination - origin
+		var sector := PackedVector2Array([origin, origin + direction.rotated(-0.14) * 1.15, origin + direction.rotated(0.14) * 1.15])
+		draw_colored_polygon(sector, Color(GOLD, 0.12))
+		draw_dashed_line(origin, destination, GOLD, 2.0, 8.0)
+		draw_arc(destination, 24, 0, TAU, 36, GOLD, 2.0, true)
 	for link: Array in _state.derived.links:
 		var start := region_screen_position(str(link[0]))
 		var end := region_screen_position(str(link[1]))

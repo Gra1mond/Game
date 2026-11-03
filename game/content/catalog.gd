@@ -20,10 +20,14 @@ const WORKER_PRICE_GROWTH: float = 1.4
 const CARGO_HOLD_PRICE: float = 16.0
 const CARGO_HOLD_CAPACITY: float = 8.0
 
+# Net station budget: ship service and the standing main-beam reserve are already excluded.
 const EMERGENCY_POWER: float = 2.0
 const RELAY_RANGE: float = 160.0
 const RELAY_POWER: float = 0.25
 const PORT_POWER: float = 0.75
+const BEAM_RESERVED_POWER: float = 0.25
+const BEAM_TARGETS: Array[String] = ["port", "oil", "quartz"]
+const PORT_BEAM_LOADING_SPEED: float = 2.0
 const MAX_POWER_REQUEST: float = 2.0
 const MIN_PRIORITY: int = -100
 const MAX_PRIORITY: int = 100

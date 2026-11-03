@@ -27,6 +27,19 @@ func dispatch(command: Dictionary) -> Dictionary:
 		_produce("alloy", 1.0)
 		_profile.revision += 1
 		return _result(true)
+	if kind == "beam":
+		if typeof(command.get("target")) != TYPE_STRING:
+			return _result(false, "invalid_command")
+		var target: String = command.target
+		if not target.is_empty():
+			if not ContentCatalog.BEAM_TARGETS.has(target):
+				return _result(false, "unknown_region")
+			if not _network.regions[target].discovered:
+				return _result(false, "not_discovered")
+		if _profile.run.beam_target != target:
+			_profile.run.beam_target = target
+			_profile.revision += 1
+		return _result(true)
 	if kind == "station_enabled":
 		var station_id: String = str(command.get("station", ""))
 		if not _profile.run.stations.has(station_id):
@@ -198,6 +211,24 @@ func snapshot() -> Dictionary:
 			derived.stations.port.reason = port_power.reason
 			derived.stations.port.active = false
 			derived.stations.port.rate = 0.0
+	var targets: Array[String] = []
+	for region: String in ContentCatalog.BEAM_TARGETS:
+		if derived.regions[region].discovered:
+			targets.append(region)
+	var lit: bool = _profile.run.beam_target == "port"
+	var preview_routes: Dictionary = {}
+	for route: String in ContentCatalog.PORT_ROUTES:
+		preview_routes[route] = {
+			"base": PortRules.route_details(route, derived.capacity, 1.0) if lit else derived.routes[route],
+			"lit": derived.routes[route] if lit else PortRules.route_details(route, derived.capacity, ContentCatalog.PORT_BEAM_LOADING_SPEED),
+		}
+	derived.beam = {
+		"target": _profile.run.beam_target, "targets": targets,
+		"reserved_power": ContentCatalog.BEAM_RESERVED_POWER,
+		"port_loading_speed": ContentCatalog.PORT_BEAM_LOADING_SPEED,
+		"port_routes": preview_routes,
+		"active": lit and derived.stations.port.active,
+	}
 	return result
 
 func export_profile() -> Dictionary:

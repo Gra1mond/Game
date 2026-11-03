@@ -62,6 +62,13 @@ var _power_rows: Dictionary = {}
 var _collect_held := false
 var _selected_region := "port"
 var _detail_open := false
+var _aim_button: Button
+var _beam_select: OptionButton
+var _beam_apply: Button
+var _beam_status: Label
+var _beam_preview: Label
+var _beam_caption: Label
+var _beam_preview_target := ""
 
 func _ready() -> void:
 	session.new_profile(1)
@@ -120,12 +127,18 @@ func _build_interface() -> void:
 	navigation.add_child(_map_button)
 	_port_button = _button("Маршруты порта", "ShowPort", show_port)
 	navigation.add_child(_port_button)
+	_aim_button = _button("Луч сюда [Enter]", "AimBeam", func() -> void: dispatch_command({"type": "beam", "target": _selected_region}))
+	navigation.add_child(_aim_button)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	navigation.add_child(spacer)
 	navigation.add_child(_button("−", "ZoomOut", func() -> void: map_view.change_zoom(1.0 / 1.2)))
 	navigation.add_child(_button("+", "ZoomIn", func() -> void: map_view.change_zoom(1.2)))
 	navigation.add_child(_button("Сброс", "ResetMap", func() -> void: map_view.reset_view()))
+	_beam_caption = _label("", 15)
+	_beam_caption.name = "BeamCaption"
+	_beam_caption.add_theme_color_override("font_color", Color("f5cb7d"))
+	chart.add_child(_beam_caption)
 	var viewport := Control.new()
 	viewport.custom_minimum_size = Vector2(360, 260)
 	viewport.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -135,6 +148,7 @@ func _build_interface() -> void:
 	map_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	viewport.add_child(map_view)
 	map_view.region_selected.connect(select_region)
+	map_view.beam_requested.connect(func(region: String) -> void: dispatch_command({"type": "beam", "target": region}))
 	harbor = PortView.new()
 	harbor.name = "PortView"
 	harbor.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -142,7 +156,7 @@ func _build_interface() -> void:
 	harbor.hide()
 	var legend := _wrapped_label()
 	legend.add_theme_font_size_override("font_size", 13)
-	legend.text = "Карта: щелчок / ← → — район · колесо / + − — масштаб\nПеретаскивание / WASD — сдвиг · Home — сброс. Линии — только действующая сеть.\nКонтур — открытый берег; столбик — построено; светлый — работает; рыжий — остановлено."
+	legend.text = "Щелчок / ← → — район · ПКМ / Enter / «Луч сюда» — направить луч\nКолесо / + − — масштаб · перетаскивание / WASD — сдвиг · Home — сброс.\nЗолотой сектор — усиление; зелёные линии — питание. Луч не заменяет реле."
 	chart.add_child(legend)
 	_sidebar_tabs = TabContainer.new()
 	_sidebar_tabs.name = "SidebarTabs"
@@ -186,6 +200,21 @@ func _build_interface() -> void:
 	var power_help := _wrapped_label()
 	power_help.text = "Выше приоритет — раньше питание. Запрос выделяется целиком, не частично. Реле и станция порта независимы: сначала нужна действующая цепь от корабля. Измените поля и нажмите «Применить»."
 	_network_container.add_child(power_help)
+	var beam_panel := _scroll_tab("Главный луч")
+	_beam_status = _wrapped_label()
+	_beam_status.name = "BeamStatus"
+	beam_panel.add_child(_beam_status)
+	_beam_select = OptionButton.new()
+	_beam_select.name = "BeamSelect"
+	_beam_select.item_selected.connect(func(index: int) -> void:
+		_beam_preview_target = str(_beam_select.get_item_metadata(index))
+		_refresh())
+	beam_panel.add_child(_beam_select)
+	_beam_preview = _wrapped_label()
+	_beam_preview.name = "BeamPreview"
+	beam_panel.add_child(_beam_preview)
+	_beam_apply = _button("Направить луч", "ApplyBeam", func() -> void: dispatch_command({"type": "beam", "target": _beam_preview_target}))
+	beam_panel.add_child(_beam_apply)
 	layout.add_child(_label("Сборщики — назначения можно свободно менять", 19))
 	var worker_scroll := ScrollContainer.new()
 	worker_scroll.name = "Workers"
@@ -217,6 +246,8 @@ func select_region(region: String) -> bool:
 	if not map_view.select_region(region):
 		return false
 	_selected_region = region
+	if session.snapshot().derived.beam.targets.has(region):
+		_beam_preview_target = region
 	if _detail_open and region != "port":
 		show_map()
 	_refresh()
@@ -261,6 +292,7 @@ func dispatch_command(command: Dictionary) -> Dictionary:
 			"relay": status.text = "Реле включено. Проверьте связь и питание ветки." if command.enabled else "Реле выключено. Зависимые ветки остановлены, груз и фазы сохранены."
 			"station_enabled": status.text = "Станция включена. Проверьте питание и назначения." if command.enabled else "Станция выключена. Реле продолжает независимо передавать связь."
 			"power": status.text = "Запрос и приоритет применены. Распределение сети пересчитано; проверьте фактическую мощность и причину остановки."
+			"beam": status.text = "Направление луча изменено. Сеть продолжает работать; груз и выполненная работа сохранены."
 			"pause": status.text = "Пауза" if paused else "Экспедиция продолжается."
 			_: status.text = "Сплав получен."
 	else:
@@ -311,7 +343,7 @@ func _refresh() -> void:
 	for target: String in details.routes:
 		var route: Dictionary = details.routes[target]
 		var upgraded_route: Dictionary = details.upgraded_routes[target]
-		route_lines.append("%s\n%.0f груза / %.0f с = %.2f/с\nС увеличенным трюмом: %.2f/с" % [route.name, route.cargo, route.cycle_seconds, route.rate, upgraded_route.rate])
+		route_lines.append("%s\n%.0f груза / %.1f с = %.2f/с\nС увеличенным трюмом: %.2f/с" % [route.name, route.cargo, route.cycle_seconds, route.rate, upgraded_route.rate])
 	_route_label.text = "\n\n".join(route_lines)
 	for id: String in state.run.workers:
 		if not _worker_rows.has(id):
@@ -332,6 +364,7 @@ func _refresh() -> void:
 	map_view.select_region(_selected_region)
 	_refresh_region(details)
 	_refresh_power(details)
+	_refresh_beam(details)
 	harbor.present(state)
 
 func _refresh_region(details: Dictionary) -> void:
@@ -357,6 +390,39 @@ func _refresh_region(details: Dictionary) -> void:
 	_relay_button.disabled = paused or region.built or not region.unlocked or not region.reachable
 	if not region.built and not region.reachable:
 		_region_label.text += "\nСначала включите и запитайте соседнее реле: район вне действующей сети."
+
+func _refresh_beam(details: Dictionary) -> void:
+	var beam: Dictionary = details.beam
+	_beam_caption.text = "Главный луч: без усиления" if str(beam.target).is_empty() else "Главный луч → " + str(details.regions[beam.target].name)
+	_aim_button.disabled = paused or not beam.targets.has(_selected_region)
+	if _beam_select.item_count != beam.targets.size() + 1:
+		_beam_select.clear()
+		_beam_select.add_item("Без усиления")
+		_beam_select.set_item_metadata(0, "")
+		for region: String in beam.targets:
+			_beam_select.add_item(str(details.regions[region].name))
+			_beam_select.set_item_metadata(_beam_select.item_count - 1, region)
+	var selected_index := 0
+	for index in range(_beam_select.item_count):
+		if _beam_select.get_item_metadata(index) == _beam_preview_target:
+			selected_index = index
+	_beam_select.select(selected_index)
+	_beam_select.disabled = paused
+	_beam_apply.disabled = paused or _beam_preview_target == beam.target
+	var target_name: String = "без усиления" if str(beam.target).is_empty() else str(details.regions[beam.target].name)
+	var effect: String = "Порт работает без бонуса главного луча."
+	if beam.target == "port":
+		effect = "Скорость погрузки ×%.1f; дорога и груз не меняются." % beam.port_loading_speed
+		if not beam.active:
+			effect += "\nНе действует: " + str(NETWORK_REASONS.get(details.stations.port.reason, details.stations.port.reason))
+	_beam_status.text = "Сейчас: %s\n%s\nСлужебный резерв луча %.2f уже учтён до бюджета станций %.2f; переключение бесплатно." % [target_name, effect, beam.reserved_power, details.power_capacity]
+	var preview_lit: bool = _beam_preview_target == "port"
+	var lines: PackedStringArray = ["После направления: погрузка порта ×%.1f" % (beam.port_loading_speed if preview_lit else 1.0)]
+	for route: String in beam.port_routes:
+		var forecast: Dictionary = beam.port_routes[route].lit if preview_lit else beam.port_routes[route].base
+		lines.append("%s: %.1f с на цикл, %.2f сплава/с" % [forecast.name, forecast.cycle_seconds, forecast.rate])
+	lines.append("Прогноз при работающем питании. Добыча других районов пока не построена; наведение не создаёт производство.")
+	_beam_preview.text = "\n\n".join(lines)
 
 func _refresh_power(details: Dictionary) -> void:
 	_power_summary.text = "Аварийное питание: %.2f / %.2f\nРадиус реле: %.0f. Остановленная ветка сохраняет груз и пройденную часть маршрута." % [details.power_used, details.power_capacity, details.range]
