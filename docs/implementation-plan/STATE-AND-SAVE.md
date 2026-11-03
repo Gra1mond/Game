@@ -8,12 +8,14 @@
 | ProfileState | total_echo, allocation, claimed_milestone_ids, discovered_locations, story_flags, cycle_index | Между экспедициями |
 | RunState | run_id, seed, tick, wallet, lifetime_produced, stations, workers, upgrades, goals, finds, project_stages, beam_target, oil_boost_target, oil_boost_enabled | Текущий цикл |
 | StationState | id, built, enabled, assigned_workers, power_request, priority, mode, phase, phase_progress, pending_output | Текущий цикл |
-| WorkerState | id, assignment, route_progress, cargo, expedition_target | Текущий цикл |
+| WorkerState | id, assignment, target, phase, phase_progress, cargo, recall_pending, queued_assignment, queued_target; expedition_target по мере появления находок | Текущий цикл |
 | Settings | volume, text_scale, effects, input_settings, automation_preferences | Отдельно от игрового профиля |
 
 `lifetime_produced` означает суммарный выпуск внутри текущего RunState, не за все экспедиции. Расход не уменьшает его. Между экспедициями сравнение идёт по `claimed_milestone_ids`, принадлежащему профилю. Факт увиденной локации не равен построенной и питаемой станции.
 
 Расчётные скорости, соединения и ограничения пересчитываются после загрузки, не являются вторым источником истины. Сохраняются незавершённые циклы, нагруженные маршруты, очередь сигналов, доля посева и заряд колодца по мере появления соответствующих районов.
+
+В T03 работник создаётся `RunState.create_worker`: idle, пустое назначение/очередь, target/queued_target=near, phase_progress=0, cargo=0, recall_pending=false. В новом цикле есть w1. Станция port присутствует в stations только после покупки; её поля пока id/kind/enabled. Единственное оснащение — upgrades.cargo_hold (отсутствует=0, приобретено=1). При добавлении SaveRepository в T10 валидировать и загружать эти поля вместе с очередью возврата; пропущенные необязательные поля получают указанные defaults, но некорректные значения не маскируются defaults.
 
 ## Инварианты
 

@@ -9,7 +9,7 @@ func frame(session: GameSession, delta: float) -> int:
 		session.dispatch({"type": "pause", "paused": true})
 		_accumulator = 0.0
 		return 0
-	if session.snapshot().paused:
+	if session.is_paused():
 		return 0
 	_accumulator += maxf(delta, 0.0)
 	var steps := 0
