@@ -2,7 +2,7 @@
 
 Godot 4.7.2 stable (`4.7.2.stable.official.ed1daf0bf`), типизированный GDScript, 2D Compatibility. Целевая платформа — Windows x64. Исходный HTML остаётся отдельным экспериментом.
 
-**Реализовано: T01–T08; T01–T07 и спецификация PR #3 приняты в `dev`.** T08 прошёл приёмку в `feat/T08-research`: корабельные данные, ограниченные исследования, навигационная оптика и автосбор; публикация отдельного PR перед подтверждением пользователя. T09 пока не начинается. 3D-модели/карточки и герои M2 остаются планом. [План](docs/implementation-plan/README.md), [графика](docs/implementation-plan/ART-AND-ASSETS.md), [прогрессия](docs/implementation-plan/CREW-AND-TALENTS.md), [навыки](docs/implementation-plan/SKILLS-RESEARCH.md).
+**Реализовано: T01–T08; T01–T07 и спецификация PR #3 приняты в `dev`.** [PR #7 — T08](https://github.com/Gra1mond/Game/pull/7) проверен и ждёт подтверждения: корабельные данные, ограниченные исследования, навигационная оптика и автосбор. T09 пока не начинается. 3D-модели/карточки и герои M2 остаются планом. [План](docs/implementation-plan/README.md), [графика](docs/implementation-plan/ART-AND-ASSETS.md), [прогрессия](docs/implementation-plan/CREW-AND-TALENTS.md), [навыки](docs/implementation-plan/SKILLS-RESEARCH.md).
 
 ## Установка и запуск
 
