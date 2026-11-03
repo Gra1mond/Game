@@ -73,10 +73,9 @@ static func describe(run: Dictionary) -> Dictionary:
 		},
 		"stations": {"port": {"reason": "not_built" if not built else ("working" if assigned > 0 else "no_worker"),
 			"active": built and assigned > 0, "rate": total_rate, "assigned_workers": assigned}},
-		"prices": {"port": {"alloy": ContentCatalog.PORT_PRICE}, "worker": {"alloy": ContentCatalog.worker_price(run.workers.size())}},
+		"prices": {"port": {"alloy": ContentCatalog.port_price(run)}, "worker": {"alloy": ContentCatalog.worker_price(run.workers.size())}},
 		"upgrades": {"cargo_hold": {"level": run.upgrades.get("cargo_hold", 0), "max_level": 1,
 			"cost": {"alloy": ContentCatalog.CARGO_HOLD_PRICE}, "next_capacity": ContentCatalog.CARGO_HOLD_CAPACITY}},
-		"power_capacity": 2.0, "power_used": 1.0 if built else 0.0,
 	}
 
 static func route_details(target: String, hold_capacity: float) -> Dictionary:

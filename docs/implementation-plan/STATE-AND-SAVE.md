@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | SaveEnvelope | schema_version, content_version, revision, profile_id | Файл целиком |
 | ProfileState | total_echo, allocation, claimed_milestone_ids, discovered_locations, story_flags, cycle_index | Между экспедициями |
-| RunState | run_id, seed, tick, wallet, lifetime_produced, stations, workers, upgrades, goals, finds, project_stages, beam_target, oil_boost_target, oil_boost_enabled | Текущий цикл |
+| RunState | run_id, seed, tick, wallet, lifetime_produced, stations, relays, workers, upgrades, goals, finds, project_stages, beam_target, oil_boost_target, oil_boost_enabled | Текущий цикл |
 | StationState | id, built, enabled, assigned_workers, power_request, priority, mode, phase, phase_progress, pending_output | Текущий цикл |
 | WorkerState | id, assignment, target, phase, phase_progress, cargo, recall_pending, queued_assignment, queued_target; expedition_target по мере появления находок | Текущий цикл |
 | Settings | volume, text_scale, effects, input_settings, automation_preferences | Отдельно от игрового профиля |
@@ -15,7 +15,11 @@
 
 Расчётные скорости, соединения и ограничения пересчитываются после загрузки, не являются вторым источником истины. Сохраняются незавершённые циклы, нагруженные маршруты, очередь сигналов, доля посева и заряд колодца по мере появления соответствующих районов.
 
-В T03 работник создаётся `RunState.create_worker`: idle, пустое назначение/очередь, target/queued_target=near, phase_progress=0, cargo=0, recall_pending=false. В новом цикле есть w1. Станция port присутствует в stations только после покупки; её поля пока id/kind/enabled. Единственное оснащение — upgrades.cargo_hold (отсутствует=0, приобретено=1). При добавлении SaveRepository в T10 валидировать и загружать эти поля вместе с очередью возврата; пропущенные необязательные поля получают указанные defaults, но некорректные значения не маскируются defaults.
+Работник создаётся `RunState.create_worker`: idle, пустое назначение/очередь, target/queued_target=near, phase_progress=0, cargo=0, recall_pending=false. В новом цикле есть w1. Станция port присутствует в stations только после покупки; поля id/kind/region=port/enabled=true/power_request=0.75/priority=0. Оснащение upgrades.cargo_hold: отсутствует=0, приобретено=1. В T10 загрузить эти поля вместе с очередью возврата; пропущенные необязательные поля получают defaults, некорректные значения не маскируются ими.
+
+T04: `run.relays` по умолчанию `{}`, ключи port/oil/quartz/coastal; записи built=true,enabled=true,power_request=0.25,priority=10. Отдельное выключение станции не выключает реле. ID потребителя в командах: station ID либо `relay:<region>`. `meta.discovered_locations` хранит известные острова и не уменьшается при разрыве. Выбранный остров и трансформации карты — только UI, не состояние производства.
+
+`GameSession._network` — пересчитываемый кэш, НЕ поле профиля и НЕ сохраняется. Содержит регионы, фактические связи и выделенную мощность; после будущей загрузки пересчитать из relays/stations/discovered_locations. Пока формат сохранения не выпущен (T10), миграция файлов не объявляется выполненной.
 
 ## Инварианты
 

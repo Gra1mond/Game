@@ -7,7 +7,7 @@ var _state: Dictionary = {}
 var _render_elapsed := 0.0
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(360, 300)
+	custom_minimum_size = Vector2(360, 260)
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -17,10 +17,13 @@ func present(state: Dictionary) -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
-	if _state.is_empty() or _state.paused:
+	if _state.is_empty() or _state.paused or not _physically_powered():
 		return
 	_render_elapsed = minf(_render_elapsed + delta, ContentCatalog.STEP)
 	queue_redraw()
+
+func _physically_powered() -> bool:
+	return bool(_state.derived.consumers.get("port", {}).get("active", false))
 
 func _home() -> Vector2:
 	return size * Vector2(0.15, 0.66)
@@ -57,7 +60,7 @@ func _draw() -> void:
 		if worker.assignment != "port":
 			continue
 		var details: Dictionary = _state.derived.workers[id]
-		var progress: float = clampf((float(worker.phase_progress) + (0.0 if _state.paused else _render_elapsed)) / float(details.phase_seconds), 0.0, 1.0)
+		var progress: float = clampf((float(worker.phase_progress) + (0.0 if _state.paused or not _physically_powered() else _render_elapsed)) / float(details.phase_seconds), 0.0, 1.0)
 		var destination := _target(worker.target) + lane
 		var position_on_route := destination
 		if worker.phase == "outbound":
@@ -71,4 +74,6 @@ func _draw() -> void:
 			draw_string(font, position_on_route + Vector2(10, 10), "+%.0f в трюме" % worker.cargo, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, GOLD)
 	if _state.paused:
 		draw_string(font, Vector2(18, size.y - 45), "ПАУЗА — производство остановлено", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, GOLD)
+	elif built and not _physically_powered():
+		draw_string(font, Vector2(18, size.y - 45), "Нет питания или связи — груз и фазы сохранены", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, GOLD)
 	draw_string(font, Vector2(18, size.y - 20), "Светлая точка — пустой сборщик · золотая — груз в пути", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, MUTED)

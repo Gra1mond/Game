@@ -20,5 +20,24 @@ const WORKER_PRICE_GROWTH: float = 1.4
 const CARGO_HOLD_PRICE: float = 16.0
 const CARGO_HOLD_CAPACITY: float = 8.0
 
+const EMERGENCY_POWER: float = 2.0
+const RELAY_RANGE: float = 160.0
+const RELAY_POWER: float = 0.25
+const PORT_POWER: float = 0.75
+const MAX_POWER_REQUEST: float = 2.0
+const MIN_PRIORITY: int = -100
+const MAX_PRIORITY: int = 100
+const REGIONS: Dictionary = {
+	"ship": {"name": "Плавучий маяк", "position": [0.0, 0.0]},
+	"port": {"name": "Кладбище кораблей", "position": [160.0, 0.0]},
+	"oil": {"name": "Масляные болота", "position": [0.0, 160.0]},
+	"quartz": {"name": "Кварцевые рифы", "position": [320.0, 0.0]},
+	"coastal": {"name": "Береговая башня", "position": [480.0, 0.0]},
+}
+const RELAY_PRICES: Dictionary = {"port": 10.0, "oil": 10.0, "quartz": 12.0, "coastal": 16.0}
+
+static func port_price(run: Dictionary) -> float:
+	return PORT_PRICE - (float(RELAY_PRICES.port) if run.relays.has("port") else 0.0)
+
 static func worker_price(worker_count: int) -> float:
 	return ceilf(WORKER_BASE_PRICE * pow(WORKER_PRICE_GROWTH, maxi(0, worker_count - 1)))
