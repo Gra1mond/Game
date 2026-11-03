@@ -14,7 +14,7 @@ static func create(seed_value: int, cycle: int = 0) -> Dictionary:
 		"stations": {}, "workers": {"w1": create_worker("w1")}, "upgrades": {}, "goals": {},
 		"finds": {}, "project_stages": {}, "beam_target": "",
 		"oil_boost_target": "", "oil_boost_enabled": false,
-		"generator_enabled": false,
+		"generator_enabled": false, "relays": {},
 	}
 
 static func create_worker(id: String) -> Dictionary:
@@ -23,3 +23,6 @@ static func create_worker(id: String) -> Dictionary:
 		"phase_progress": 0.0, "cargo": 0.0,
 		"recall_pending": false, "queued_assignment": "", "queued_target": "near",
 	}
+
+static func create_relay() -> Dictionary:
+	return {"built": true, "enabled": true, "power_request": ContentCatalog.RELAY_POWER, "priority": 10}
