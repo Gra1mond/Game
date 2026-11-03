@@ -26,11 +26,8 @@ func dispatch(command: Dictionary) -> Dictionary:
 	if _paused:
 		return _result(false, "paused")
 	if kind == "collect":
-		var run: Dictionary = _profile.run
-		if int(run.tick) - int(run.last_collect_tick) < ContentCatalog.MANUAL_COOLDOWN_TICKS:
+		if not _collect_if_ready():
 			return _result(false, "cooldown")
-		run.last_collect_tick = run.tick
-		_produce("alloy", 1.0)
 		_profile.revision += 1
 		return _result(true)
 	if kind == "beam":
@@ -102,6 +99,29 @@ func dispatch(command: Dictionary) -> Dictionary:
 		_profile.run.relays[region].enabled = command.enabled
 		_profile.revision += 1
 		_refresh_network()
+		return _result(true)
+	if kind == "automation":
+		if int(_profile.run.research_levels.get("automation", 0)) == 0:
+			return _result(false, "research_required")
+		_profile.run.automation_enabled = bool(command.get("enabled", false))
+		_profile.revision += 1
+		return _result(true)
+	if kind == "research":
+		var id: String = str(command.get("id", ""))
+		if not ContentCatalog.RESEARCHES.has(id):
+			return _result(false, "unknown_research")
+		var study: Dictionary = ContentCatalog.RESEARCHES[id]
+		var level: int = _profile.run.research_levels.get(id, 0)
+		if level >= study.costs.size():
+			return _result(false, "max_level")
+		var cost: Dictionary = study.costs[level]
+		for resource: String in cost:
+			if _profile.run.wallet[resource] < cost[resource]:
+				return _result(false, "insufficient_" + resource)
+		for resource: String in cost:
+			_profile.run.wallet[resource] -= cost[resource]
+		_profile.run.research_levels[id] = level + 1
+		_profile.revision += 1
 		return _result(true)
 	if kind == "upgrade" and command.get("id") == "quartz_lens":
 		var station_id: String = str(command.get("station", ""))
@@ -229,7 +249,7 @@ func dispatch(command: Dictionary) -> Dictionary:
 		if not _profile.run.workers.has(worker_id):
 			return _result(false, "unknown_worker")
 		var station_id: String = str(command.get("station", ""))
-		if not _profile.run.stations.has(station_id):
+		if station_id != "research" and not _profile.run.stations.has(station_id):
 			return _result(false, "unknown_station")
 		if not ContentCatalog.PORT_ROUTES.has(target):
 			return _result(false, "unknown_target")
@@ -250,7 +270,7 @@ func dispatch(command: Dictionary) -> Dictionary:
 		else:
 			worker.assignment = station_id
 			worker.target = target
-			worker.phase = "outbound" if station_id == "port" else "operating"
+			worker.phase = "research" if station_id == "research" else ("outbound" if station_id == "port" else "operating")
 			worker.phase_progress = 0.0
 			worker.recall_pending = false
 			worker.queued_assignment = ""
@@ -282,11 +302,16 @@ func advance(seconds: float) -> void:
 	while _remainder + 0.00000001 >= ContentCatalog.STEP:
 		_remainder -= ContentCatalog.STEP
 		_profile.run.tick += 1
+		if _profile.run.automation_enabled:
+			_collect_if_ready()
 		var generating: bool = _profile.run.generator_built and _profile.run.generator_enabled and _spend_oil(ContentCatalog.GENERATOR_OIL_PER_SECOND * ContentCatalog.STEP)
 		if generating != _generator_active:
 			_generator_active = generating
 			_refresh_network()
 		_reserve_boost()
+		var data: float = ResearchRules.advance(_profile.run, ContentCatalog.STEP)
+		if data > 0.0:
+			_produce("data", data)
 		var oil_powered: bool = _network.consumers.has("oil") and _network.consumers.oil.active
 		var oil: float = OilRules.advance(_profile.run, ContentCatalog.STEP, oil_powered)
 		if oil > 0.0:
@@ -311,6 +336,13 @@ func snapshot() -> Dictionary:
 	var oil_bonus: float = ContentCatalog.OIL_BOOST_BONUS if _boost_active and _profile.run.oil_boost_target == "port" else 0.0
 	result["derived"] = PortRules.describe(_profile.run, oil_bonus)
 	var derived: Dictionary = result.derived
+	derived.laboratory = ResearchRules.describe(_profile.run, _paused)
+	derived.research = ResearchRules.studies(_profile.run, derived.capacity)
+	derived.automation = ResearchRules.automation(_profile.run, _paused)
+	var researcher: String = derived.laboratory.assigned_worker
+	if not researcher.is_empty():
+		derived.workers[researcher].progress = derived.laboratory.progress
+		derived.workers[researcher].phase_seconds = ContentCatalog.RESEARCH_SECONDS
 	derived.regions = _network.regions.duplicate(true)
 	derived.consumers = _network.consumers.duplicate(true)
 	derived.links = _network.links.duplicate(true)
@@ -339,10 +371,11 @@ func snapshot() -> Dictionary:
 			targets.append(region)
 	var lit: bool = _profile.run.beam_target == "port"
 	var preview_routes: Dictionary = {}
+	var travel_speed: float = ContentCatalog.research_effect(_profile.run, "optics")
 	for route: String in ContentCatalog.PORT_ROUTES:
 		preview_routes[route] = {
-			"base": PortRules.route_details(route, derived.capacity, 1.0 + oil_bonus) if lit else derived.routes[route],
-			"lit": derived.routes[route] if lit else PortRules.route_details(route, derived.capacity, ContentCatalog.PORT_BEAM_LOADING_SPEED + oil_bonus),
+			"base": PortRules.route_details(route, derived.capacity, 1.0 + oil_bonus, travel_speed) if lit else derived.routes[route],
+			"lit": derived.routes[route] if lit else PortRules.route_details(route, derived.capacity, ContentCatalog.PORT_BEAM_LOADING_SPEED + oil_bonus, travel_speed),
 		}
 	derived.beam = {
 		"target": _profile.run.beam_target, "targets": targets,
@@ -351,7 +384,7 @@ func snapshot() -> Dictionary:
 		"port_routes": preview_routes,
 		"active": (lit and derived.stations.port.active) or (_profile.run.beam_target == "oil" and derived.stations.oil.active),
 		"oil_pressure_speed": ContentCatalog.OIL_BEAM_PRESSURE_SPEED,
-		"oil_rates": {"base": OilRules.rates(false), "lit": OilRules.rates(true)},
+		"oil_rates": {"base": OilRules.rates(_profile.run, false), "lit": OilRules.rates(_profile.run, true)},
 	}
 	var generator_reason := "not_built"
 	if _profile.run.generator_built:
@@ -377,8 +410,8 @@ func snapshot() -> Dictionary:
 	var beam_speed: float = ContentCatalog.PORT_BEAM_LOADING_SPEED if lit else 1.0
 	for route: String in ContentCatalog.PORT_ROUTES:
 		boost_routes[route] = {
-			"off": derived.routes[route] if oil_bonus == 0.0 else PortRules.route_details(route, derived.capacity, beam_speed),
-			"on": derived.routes[route] if oil_bonus > 0.0 else PortRules.route_details(route, derived.capacity, beam_speed + ContentCatalog.OIL_BOOST_BONUS),
+			"off": derived.routes[route] if oil_bonus == 0.0 else PortRules.route_details(route, derived.capacity, beam_speed, travel_speed),
+			"on": derived.routes[route] if oil_bonus > 0.0 else PortRules.route_details(route, derived.capacity, beam_speed + ContentCatalog.OIL_BOOST_BONUS, travel_speed),
 		}
 	derived.oil_boost.port_routes = boost_routes
 	_describe_quartz(derived)
@@ -432,6 +465,14 @@ func _spend_oil(amount: float) -> bool:
 	if float(_profile.run.wallet.oil) + 0.00000001 < amount:
 		return false
 	_profile.run.wallet.oil = maxf(0.0, float(_profile.run.wallet.oil) - amount)
+	return true
+
+func _collect_if_ready() -> bool:
+	var run: Dictionary = _profile.run
+	if int(run.tick) - int(run.last_collect_tick) < ContentCatalog.MANUAL_COOLDOWN_TICKS:
+		return false
+	run.last_collect_tick = run.tick
+	_produce("alloy", 1.0)
 	return true
 
 func _produce(id: String, amount: float) -> void:

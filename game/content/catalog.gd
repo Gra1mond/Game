@@ -35,6 +35,29 @@ const QUARTZ_UNLOCK_PRODUCTION: Dictionary = {"alloy": 8.0, "oil": 8.0}
 const QUARTZ_BEAM_CHARGE_SPEED: float = 2.0
 const QUARTZ_LENS_PRICE: float = 4.0
 const QUARTZ_LENS_CHARGE_SECONDS: float = 6.0
+const RESEARCH_SECONDS: float = 5.0
+const RESEARCH_BATCH: float = 1.0
+const RESEARCHES: Dictionary = {
+	"capacity": {
+		"name": "Вместимость сборщиков", "description": "Дополнительные места в трюме. Складываются с уже установленным оснащением.",
+		"costs": [{"data": 4.0, "alloy": 8.0}, {"data": 8.0, "alloy": 16.0}, {"data": 12.0, "alloy": 24.0}],
+		"effects": [0.0, 1.0, 2.0, 3.0], "unit": "ед. груза",
+	},
+	"stability": {
+		"name": "Устойчивость насоса", "description": "Ускоряет автоматическое охлаждение. Накопленное тепло и партия сохраняются.",
+		"costs": [{"data": 4.0, "alloy": 8.0}, {"data": 8.0, "alloy": 12.0}, {"data": 12.0, "alloy": 16.0}],
+		"effects": [1.0, 1.2, 1.4, 1.6], "unit": "с охлаждения",
+	},
+	"optics": {
+		"name": "Навигационная оптика", "description": "Кварцевые ориентиры ускоряют путь портовых сборщиков, не погрузку.",
+		"costs": [{"data": 6.0, "quartz": 4.0}, {"data": 12.0, "quartz": 8.0}],
+		"effects": [1.0, 1.25, 1.5], "unit": "× скорости пути",
+	},
+	"automation": {
+		"name": "Базовый автосбор", "description": "Повторяет бесплатный ручной разбор. Общий интервал с ручным сбором; включается отдельно.",
+		"costs": [{"data": 8.0, "alloy": 12.0}], "effects": [0.0, 2.0], "unit": "сплава/с",
+	},
+}
 const WORKER_CAPACITY: float = 4.0
 const PORT_ROUTES: Dictionary = {
 	"near": {"name": "Ближний обломок", "travel_seconds": 2.0, "loading_seconds": 1.0, "cargo_limit": 4.0},
@@ -81,3 +104,6 @@ static func quartz_count(run: Dictionary) -> int:
 		if run.stations[id].kind == "quartz":
 			count += 1
 	return count
+
+static func research_effect(run: Dictionary, id: String) -> float:
+	return float(RESEARCHES[id].effects[int(run.research_levels.get(id, 0))])

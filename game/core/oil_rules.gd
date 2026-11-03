@@ -6,7 +6,7 @@ static func advance(run: Dictionary, delta: float, powered: bool) -> float:
 		return 0.0
 	var station: Dictionary = run.stations.oil
 	if station.phase == "cooling":
-		station.heat = maxf(0.0, float(station.heat) - ContentCatalog.OIL_COOLING_RATE * delta)
+		station.heat = maxf(0.0, float(station.heat) - cooling_rate(run) * delta)
 		station.phase_progress += delta
 		if station.heat <= 0.00000001:
 			station.heat = 0.0
@@ -48,12 +48,15 @@ static func assigned_worker(run: Dictionary) -> String:
 			return id
 	return ""
 
-static func rates(lit: bool) -> Dictionary:
+static func cooling_rate(run: Dictionary) -> float:
+	return ContentCatalog.OIL_COOLING_RATE * ContentCatalog.research_effect(run, "stability")
+
+static func rates(run: Dictionary, lit: bool) -> Dictionary:
 	var pressure: float = ContentCatalog.OIL_PRESSURE_SECONDS / (ContentCatalog.OIL_BEAM_PRESSURE_SPEED if lit else 1.0)
 	var batches: float = ceilf(ContentCatalog.OIL_HEAT_LIMIT / ContentCatalog.OIL_HEAT_PER_BATCH)
 	return {
 		"steady": ContentCatalog.OIL_BATCH / (pressure + ContentCatalog.OIL_PUMP_SECONDS),
-		"overdrive": batches * ContentCatalog.OIL_OVERDRIVE_BATCH / (batches * (pressure + ContentCatalog.OIL_OVERDRIVE_PUMP_SECONDS) + ContentCatalog.OIL_HEAT_LIMIT / ContentCatalog.OIL_COOLING_RATE),
+		"overdrive": batches * ContentCatalog.OIL_OVERDRIVE_BATCH / (batches * (pressure + ContentCatalog.OIL_OVERDRIVE_PUMP_SECONDS) + ContentCatalog.OIL_HEAT_LIMIT / cooling_rate(run)),
 	}
 
 static func describe(run: Dictionary, power: Dictionary) -> Dictionary:
@@ -74,14 +77,15 @@ static func describe(run: Dictionary, power: Dictionary) -> Dictionary:
 	var work: float = ContentCatalog.OIL_PRESSURE_SECONDS if phase == "pressure" else (ContentCatalog.OIL_OVERDRIVE_PUMP_SECONDS if hot else ContentCatalog.OIL_PUMP_SECONDS)
 	var progress: float = clampf(float(station.get("phase_progress", 0.0)) / work, 0.0, 1.0)
 	var seconds: float = work / (pressure_speed if phase == "pressure" else 1.0)
+	var cooling: float = cooling_rate(run)
 	if phase == "cooling":
 		progress = 1.0 - heat / ContentCatalog.OIL_HEAT_LIMIT
-		seconds = ContentCatalog.OIL_HEAT_LIMIT / ContentCatalog.OIL_COOLING_RATE
+		seconds = ContentCatalog.OIL_HEAT_LIMIT / cooling
 	var powered: bool = power.get("active", false)
 	var reason := "not_built"
 	if built:
 		reason = str(power.get("reason", "no_power")) if not powered else ("no_worker" if assigned.is_empty() else ("cooling" if phase == "cooling" else "working"))
-	var forecast: Dictionary = rates(run.beam_target == "oil")
+	var forecast: Dictionary = rates(run, run.beam_target == "oil")
 	var rate: float = forecast[mode] if built and powered and not assigned.is_empty() else 0.0
 	return {
 		"built": built, "active": reason == "working", "reason": reason, "power": power.get("power", 0.0),
@@ -89,7 +93,7 @@ static func describe(run: Dictionary, power: Dictionary) -> Dictionary:
 		"phase": phase, "progress": progress, "phase_seconds": seconds,
 		"pressure": progress if phase == "pressure" else (1.0 if phase == "pumping" else 0.0),
 		"heat": heat, "heat_limit": ContentCatalog.OIL_HEAT_LIMIT,
-		"cooling_seconds": heat / ContentCatalog.OIL_COOLING_RATE if phase == "cooling" else 0.0,
+		"cooling_rate": cooling, "cooling_seconds": heat / cooling if phase == "cooling" else 0.0,
 		"next_output": ContentCatalog.OIL_OVERDRIVE_BATCH if hot else ContentCatalog.OIL_BATCH,
 		"rate": rate, "steady_rate": forecast.steady, "overdrive_rate": forecast.overdrive,
 	}
