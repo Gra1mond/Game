@@ -1,0 +1,105 @@
+# Исследование skills и инструментов для графики
+
+Дата наблюдений: **2026-11-03**. Это исследование источников, а не установка, разрешение на выполнение или доказательство готового конвейера. Требования уже согласованы в [ART-AND-ASSETS](ART-AND-ASSETS.md); новый конкурирующий GDD не создаётся. Игровая механика экипажа/талантов — в [CREW-AND-TALENTS](CREW-AND-TALENTS.md).
+
+Сверены опубликованные listings, upstream SKILL.md, отдельные рецепты/скрипты и первичные лицензии. Install counts — округлённые показания skills.sh, stars — наблюдения GitHub API/источников на эту дату; они меняются и не являются тестом качества. Stars относятся ко всему репозиторию, не отдельному skill. Ни одного инструмента/skill/asset pack не установлено в рамках исследования, скрипты кандидатов не запускались, платные запросы/загрузки не выполнялись. Утверждения upstream о тестах ниже явно отделены от проектной проверки.
+
+## Практический вывод
+
+1. Для native Godot полезны узкие `godot-ui`, `assets-pipeline` и `godot-gdscript`: это помощь с Control, импортом и языком, а не производство арта.
+2. Для локального авторства техники исследован набор `blender-modeling` + `blender-materials` + `blender-uv-texturing` + `blender-export`. Он содержит реальные Python/mesh/material/export-рецепты, но не готовый генератор реалистичной морской техники и не систему согласованных upgrade-версий. Проектные параметры, детерминизм, manifest и качество остаются работой T12A.
+3. Для людей в M2 наиболее обоснован локальный маршрут Blender + MPFB2 + индивидуально проверенные CC0-компоненты → поза → baked PBR → GLB. Это не agent skill и не продемонстрированная здесь модель капитана.
+4. Установка большого пакета, MCP, облачная генерация и платные API не нужны для принятия этой спецификации и не разрешены ею. Консервативная альтернатива MCP — проверенные проектные Blender Python-сценарии через локальный CLI. Оба способа требуют реально установленного Blender и контроля выполняемого кода.
+
+## Проверенные кандидаты
+
+Все перечисленные Godot/Blender community skills не являются официальными skills Godot/Blender. Исключение по авторству среди сравнений — Anthropic frontend-design, но он web-ориентирован.
+
+| Репозиторий / skill и primary source | Наблюдаемая популярность | Польза и реальный выход | Зависимости, лицензия, ограничения |
+| --- | --- | --- | --- |
+| [jame581/GodotPrompter — godot-ui](https://github.com/jame581/GodotPrompter/blob/master/skills/godot-ui/SKILL.md) | [207 installs](https://skills.sh/jame581/godotprompter/godot-ui), [922 stars](https://api.github.com/repos/jame581/GodotPrompter) | Native Control, anchors/containers, Theme/StyleBox, фокус, меню/сигналы; есть замечания для 4.7. Результат — знания/код/scenes, не изображение. | Godot; MIT repo. Без обязательного API/облака. Проверять конкретный API на Godot 4.7.2. Рекомендуется к целевому изучению, не к слепой установке. |
+| [jame581/GodotPrompter — assets-pipeline](https://github.com/jame581/GodotPrompter/blob/master/skills/assets-pipeline/SKILL.md) | [206 installs](https://skills.sh/jame581/godotprompter/assets-pipeline), те же 922 stars | Alpha borders, compression/mipmaps/filtering, glTF/Blender import, resource/audio pipeline. | MIT; Godot, Blender только для прямого `.blend` import. Наш поставочный путь — заранее экспортированный GLB, не runtime Blender. Не создаёт исходную графику и не лицензирует её. |
+| [gamedev-skills/awesome-gamedev-agent-skills — godot-gdscript](https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/main/skills/godot/godot-gdscript/SKILL.md) | [8.5K installs](https://skills.sh/gamedev-skills/awesome-gamedev-agent-skills/godot-gdscript), [6,664 stars](https://api.github.com/repos/gamedev-skills/awesome-gamedev-agent-skills) | Typed GDScript, lifecycle, signals, await, migration; заявлена 4.7. | Apache-2.0 repo, Godot. Supporting language skill: не meshgen, не доказательство архитектуры/баланса. |
+| [RobLe3/cc-blender-skill — blender-modeling](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-modeling/SKILL.md) | [2.7K installs](https://skills.sh/roble3/cc-blender-skill/blender-modeling), [139 stars](https://api.github.com/repos/RobLe3/cc-blender-skill) | Исполняемые Blender Python-рецепты hard-surface, modifiers/Booleans, mesh editing. | MIT repo; Blender и отдельная настройка backend для MCP-workflow. Organic — blockout, не реалистичный человек; сам по себе не даёт PBR/LOD/GLB/PNG комплект. |
+| [RobLe3 — blender-materials](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-materials/SKILL.md) | [2.0K installs](https://skills.sh/roble3/cc-blender-skill/blender-materials), те же 139 stars | Principled recipes для металлов, дерева, ткани, стекла; [rust/wear noise-mask](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-materials/references/overview.md#L193-L209). | MIT; Blender. Есть настоящий подход к износу, но нет законченного nautical generator: солевые потёки, ватерлиния, сколы/ремонты требуют авторства. Procedural nodes нельзя обещать перенести в GLB без bake. |
+| [RobLe3 — blender-uv-texturing](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-uv-texturing/SKILL.md) | [1.4K installs](https://skills.sh/roble3/cc-blender-skill/blender-uv-texturing), те же 139 stars | UV/atlas, image PBR, color spaces, Cycles bake example. | MIT; Blender/Cycles. Inline bake — color-only, не полный PBR pipeline. Helper `normal_or_bump` подаёт картинку в `Bump.Height`, **не** корректный tangent-space Normal Map. Нужны самостоятельная корректировка и Godot-проверка. |
+| [RobLe3 — blender-export](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-export/SKILL.md) | [1.7K installs](https://skills.sh/roble3/cc-blender-skill/blender-export), те же 139 stars | Реальный `bpy.ops.export_scene.gltf` GLB recipe, export prep/decimation. | MIT; Blender. Default scope сцены надо заменить явно выбранной upgrade-коллекцией. Упомянутые pack-ограничения 8/15 MB и 1024 px — не технический предел Godot/glTF. |
+| [RobLe3 — blender-pro-workflow](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-pro-workflow/SKILL.md) | [1.6K installs](https://skills.sh/roble3/cc-blender-skill/blender-pro-workflow), те же 139 stars | Reference → blockout → refine → materials → export; incremental `.blend` saves. | MIT; это workflow, а не deterministic version generator. `VERSIONING.md` описывает версии skill pack, не model tiers проекта. Не обязательный дополнительный install. |
+| [saschb2b/skills — game-design](https://github.com/saschb2b/skills/blob/main/skills/productivity/game-design/SKILL.md) | [83 installs](https://skills.sh/saschb2b/skills/game-design), [22 stars](https://api.github.com/repos/saschb2b/skills) | Loops, economies, dominant strategies, UI/onboarding/accessibility; аналитическая справка. | MIT repo, без generation runtime. Слабее adoption evidence; команды concept/wire создают документы/hooks. Не запускать для параллельного GDD: источником остаются существующие docs. |
+| [jwynia/agent-skills — godot-asset-generator](https://github.com/jwynia/agent-skills/blob/main/skills/tech/game-development/godot/godot-asset-generator/SKILL.md) | [1.0K installs](https://skills.sh/jwynia/agent-skills/godot-asset-generator), [180 stars](https://api.github.com/repos/jwynia/agent-skills) | Реальный [Deno generator](https://github.com/jwynia/agent-skills/blob/main/skills/tech/game-development/godot/godot-asset-generator/scripts/generate-image.ts): OpenAI/Replicate/fal.ai, PNG/spritesheets/metadata. **Не 3D.** | Deno, ImageMagick, сеть, ключи и платные calls; prompts покидают машину. Skill декларирует MIT, GitHub repo license metadata null — лицензию выбранной ревизии проверять отдельно. Цены/права каждого provider/model не аудированы. Не рекомендован turnkey: false-success ниже. |
+
+### Почему генератор 2D нельзя принимать по success flag
+
+Статически прочитан [process-sprite.ts, строки 138–181](https://github.com/jwynia/agent-skills/blob/main/skills/tech/game-development/godot/godot-asset-generator/scripts/process-sprite.ts#L138-L181): запускается ImageMagick `magick` через Deno.Command, хотя пример разрешений не предоставляет subprocess permission. При ошибке catch копирует исходную картинку и возвращает `success: true` с полем ошибки. Это **наблюдение кода, не выполненный здесь runtime failure**. White-to-alpha также не является semantic background removal. Прозрачность, размеры, полезный spritesheet и корректность результата должны проверяться по выходному артефакту, не флагу. Для утверждённого локального 3D-маршрута этот платный 2D-кандидат не нужен.
+
+### Слабые и существующие альтернативы
+
+- [tippyentertainment/skills — comfyui-godot-gameplay-creator](https://skills.sh/tippyentertainment/skills/comfyui-godot-gameplay-creator): **3 installs**, [0 stars, license null](https://api.github.com/repos/tippyentertainment/skills). [Реальный source](https://github.com/tippyentertainment/skills/blob/main/skills/comfyui-godot-game-creator/SKILL.md) выдаёт structured prompt jobs для отдельного ComfyUI wrapper. Надпись «2D/3D» не доказывает mesh generation. Не установлены наличие wrapper/workflows/checkpoints, hardware requirements и лицензии моделей; старое targeting 4.6 RC1. Не рекомендовать рабочим конвейером.
+- Существующий локальный **impeccable** полезен для иерархии, контраста, когнитивной нагрузки и motion; его workflow ориентирован на browser/CSS/Node, не Godot/meshgen. Установленный upstream owner/revision/license/popularity не установлен; приписывать ему счётчики одной из одноимённых публикаций нельзя.
+- [anthropics/skills — frontend-design](https://skills.sh/anthropics/skills/frontend-design): **1.1M installs** в listing, официальный Anthropic, локально осмотренная лицензия Apache-2.0. HTML/CSS/JS/React/Vue, не native Godot и не создание моделей. Установленная ревизия неизвестна и отличается от опубликованных инструкций; GitHub stars для этого сравнения не проверялись. Переносить принципы, не web runtime.
+- Упоминание `image_gen` в skill не создаёт инструмент: в исследовательской сессии он не был доступен. Наличие Python, ffmpeg или ollama не означает наличие image/3D generation model либо оплаченного API.
+
+## Blender: selective install, backend и безопасность
+
+[Repository listing](https://www.skills.sh/roble3/cc-blender-skill) показывал 30 leaves / 36.4K aggregate installs; GitHub API — 139 stars, 16 forks, MIT. Эти агрегаты не означают необходимость всех 30 leaves. [MIT license](https://github.com/RobLe3/cc-blender-skill/blob/main/LICENSE) покрывает код/документы pack, не чужие textures, модели, reference photos или условия генеративных сервисов.
+
+Каждый осмотренный leaf ссылается на sibling [text-to-blender/references/mcp-backends.md](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/text-to-blender/references/mcp-backends.md), оттуда — на [agent-hosts.md](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/text-to-blender/references/agent-hosts.md). Host guide рекомендует все папки для сохранения relative references. **Узкая установка нескольких leaves не доказана самодостаточной.** При будущей подготовке взять reviewed pinned checkout и сохранить нужные sibling reference files; не копировать три SKILL.md и не объявлять зависимости решёнными. Это не причина автоматически устанавливать весь pack.
+
+- Official backend по guide: Blender **≥5.1**, add-on, отдельный MCP server process и совместимый агент/client. Legacy ahujasid route документирует **≥4.0**; совместимость всех актуальных 4.x компонентов здесь не запускалась.
+- Add-on сам по себе не предоставляет агенту tools. Нужны client/server/file access и возможность осмотреть изображение; удалённый Blender добавляет передачу файлов. Одинаковое имя executable `blender-mcp` у разных backends требует отдельных environments/absolute paths; не смешивать установки. Guide описывает 9876/9877 для dual setup — он нам не требуется.
+- [Официальное предупреждение Blender MCP](https://www.blender.org/lab/mcp-server/): произвольный сгенерированный Python выполняется без защиты от удаления данных/эксфильтрации; рекомендуется VM/среда без чувствительных данных. «Локально» не означает sandbox/private. Проверять source, ограничивать filesystem/network, не держать секреты в art workspace. `allowed-tools` в skill не создаёт безопасность в произвольном host.
+- В сессии нет реально подключённого Blender MCP; нельзя обещать вызвать его из доступных tools. Локальный CLI с проверенными проектными сценариями — более узкая альтернатива, всё равно исполняющая код и требующая review/изоляции.
+- Базовые modeling/material/bake/export не требуют платного сервиса. Poly Haven/Sketchfab/Hyper3D/Hunyuan integrations optional и имеют свои права/доступ/fees; наличие имени tool не означает credentials или бесплатность. `opencv-python numpy scipy Pillow` нужны отдельным helper workflows, не каждому GLB.
+- [multires_bake_export.py](https://github.com/RobLe3/cc-blender-skill/blob/main/plugin/skills/blender-export/scripts/multires_bake_export.py) действительно печёт normals, но требует один используемый material, UV/single-user resources и FBX output. Это не готовый multi-material PBR→GLB или tier-generator.
+- [Upstream v1.4.0 integration report](https://github.com/RobLe3/cc-blender-skill/blob/main/docs/test-results/v1.4.0-integration.md) заявляет Blender 5.1.1, оба MCP routes, 35/35 core recipe checks на route и GLB. Это **отчёт автора**, не запуск здесь, не проверка realistic nautical art, Godot import, Windows или нашей производительности. Названные validation subjects не заменяют сборщик/порт проекта.
+
+## Человеческие модели для M2
+
+### Предпочтительный исследованный вариант — MPFB2
+
+- [Primary license](https://raw.githubusercontent.com/makehumancommunity/mpfb2/master/LICENSE.md): код plugin — **GPLv3-or-later**; перечисленные base mesh/proxies/targets/textures/clothes/rigs/poses/expressions/mesh data — **CC0**. Раздел output явно охватывает exports, saved models, renderings и графический результат scripts/plugins. Это не blanket-license на все third-party packs.
+- [Official getting started](https://static.makehumancommunity.org/mpfb/docs/getting_started.html): Blender **≥4.2.0**, MakeHuman standalone не требуется. Нужны plugin и system asset pack. Реально закреплённая версия должна одновременно подходить MPFB и выбранному authoring backend; минимальные версии не доказательство совместимости.
+- [Asset-pack index](https://static.makehumancommunity.org/assets/assetpacks/index.html) явно разделяет **CC0** и **CC-BY**. CC0 starting points: system assets, Skins02, Bodyparts05, Hair01, Hats01, Pants01, Shirts01, Shoes01, Gloves01. Некоторые другие hats/beards/shirts/boots/tools — CC-BY: нужны конкретный автор, версия и attribution. Не выводить лицензию по похожему названию.
+- [FAQ](https://static.makehumancommunity.org/assets/assetpacks/faq.html) предупреждает о clipping/skin poking through clothes; «checked» — cursory inspection, не production-ready fit. Готовый морской костюм капитана не доказан. Нужны собственные/лицензированные одежда и детали, подходящие силуэт, лицо, пропорции, материалы и проверка fit в каждой позе.
+- Планируемый результат — реалистичные ordinary crew и различимые капитан/инженер/штурман (`navigator`), сохранённые параметры/позы, supported image PBR, статичный GLB. Rigify/mocap для спокойного вращения не обязательны. Внешность героя не выдаёт ему несуществующую редкость/пассивку. У ordinary crew нет 12-node tree.
+
+### Сравнение альтернатив
+
+| Инструмент | Проверенный источник и условия | Решение |
+| --- | --- | --- |
+| MakeHuman standalone | [Primary license](https://raw.githubusercontent.com/makehumancommunity/makehuman/master/makehuman/license.txt): приложение/UI — AGPLv3-or-later, bundled graphical assets — CC0, output разрешён, сторонние assets отдельно. [Install docs](https://static.makehumancommunity.org/makehuman/docs/installation.html) содержат старые platform/version инструкции; MPFB integration требует MakeHuman ≥1.2.0. | Возможная дополнительная authoring app, не обязательна при MPFB2. Не считать старые package-команды проверенным WSL setup. |
+| Rigify | [Official manual](https://docs.blender.org/manual/en/latest/addons/rigify/index.html): GPL add-on, генератор control rigs. | Optional posing aid, не источник human geometry и не CC0-лицензия на чужой mesh/rig. В runtime достаточно posed mesh без Blender control scripts. |
+| MB-Lab | [Primary license](https://raw.githubusercontent.com/animate1978/MB-Lab/master/license.txt), [license docs](https://mb-lab-docs.readthedocs.io/en/latest/license.html): код GPLv3, mesh/images/database и generated models по умолчанию **AGPLv3**, не CC0. README называет 1.8.1 финальной версией, Blender ≥4.0. | Не рекомендован drop-in для unrestricted GLB pipeline. Commercial use не категорически запрещён, но условия иные; специальное правило 2D renders не очищает распространяемый 3D GLB. |
+| [lesterppo/hermes-blender-mpfb2](https://github.com/lesterppo/hermes-blender-mpfb2), [SKILL.md](https://github.com/lesterppo/hermes-blender-mpfb2/blob/main/SKILL.md) | MIT-declared, **0 stars** при чтении; installs не установлены. Hermes-specific direct morph → untextured static STL/3D printing, не MPFB add-on workflow; excludes animation/rigging. Версия «Blender 4.1 LTS» и сводка лицензий расходятся с official MPFB. | Только unvalidated implementation reference, не готовое PBR/GLB решение. |
+
+MPFB/MakeHuman/Rigify — приложения/плагины, не skills.sh skills; сопоставимых install/star counts в этом исследовании не проверяли. Не придумывать им метрики.
+
+## Команды только как справка для будущего решения
+
+**Не выполнены и не являются рекомендацией запускать сейчас.** Перед любым запуском проверить source/revision/license, зависимые references и scope host; установка `npx` также исполняет/получает сторонний код. Не использовать слепые глобальные `-g -y` или auto-update. Изучение исходников из pinned checkout может быть достаточным без регистрации skill.
+
+```text
+npx skills add https://github.com/jame581/GodotPrompter --skill godot-ui
+npx skills add https://github.com/jame581/GodotPrompter --skill assets-pipeline
+npx skills add https://github.com/gamedev-skills/awesome-gamedev-agent-skills --skill godot-gdscript
+npx skills add https://github.com/RobLe3/cc-blender-skill --skill blender-modeling
+npx skills add https://github.com/RobLe3/cc-blender-skill --skill blender-materials
+npx skills add https://github.com/RobLe3/cc-blender-skill --skill blender-uv-texturing
+npx skills add https://github.com/RobLe3/cc-blender-skill --skill blender-export
+```
+
+Синтаксис selective install не доказывает сохранение sibling dependencies. MPFB ставится по official guide после выбора совместимой версии Blender и asset packs; неподтверждённую shell-команду для текущей машины не предлагать. Платный 2D generator, слабые ComfyUI/Hermes кандидаты и весь 30-leaf pack в команды установки намеренно не включены.
+
+## Что установлено о локальной среде, а что ещё предстоит доказать
+
+Предыдущее файловое исследование нашло Godot 4.7.2 binary, Python 3.12 и ffmpeg/ffprobe; версии/функциональность последних не запускались. Blender/bpy и специализированные candidate skills не найдены в осмотренных conventional locations — это не исчерпывающая инвентаризация всех дисков/Windows. Стандартная локальная папка Godot export_templates была пуста, Windows export не установлен этим наблюдением. В текущем проекте нет доказанного asset generator/manifest/production-art pipeline; procedural 2D не является завершённой новой графикой.
+
+Решения о направлении, локальности и карточках уже приняты пользователем; исследовательские старые вопросы не открывают их заново. В T12A нужны provisioning с разрешения, реальные lock/recipes/source/GLB/PNG, manifest/licenses, Godot render, upgrade и measured performance. В T17A — реальная первая character-модель и fit/material/license proof. В T20/T24 — полная карта/карточки и Windows proof. Отсутствие среды отмечать как конкретный непроверенный пункт, не заменять primitives, success flag, upstream report или выдуманным успешным запуском.
+
+### Первичные технические основания
+
+- [Godot Viewports](https://docs.godotengine.org/en/stable/tutorials/rendering/viewports.html): 3D внутри 2D, отдельный World3D и управление обновлением viewport. Native 3D-card не требует свободной 3D-карты.
+- [Godot 3D formats](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_3d_scenes/available_formats.html): рекомендуемый glTF/GLB; готовый GLB, в отличие от прямого `.blend` import, не требует Blender на каждой импортирующей машине.
+- [Blender glTF exporter](https://docs.blender.org/manual/en/latest/addons/scene_gltf2.html): поддерживаемые material inputs/recognized nodes; arbitrary procedural shaders не переносятся автоматически, non-mesh/curves требуют подготовки.
+
+Эти источники объясняют техническую возможность, но не заменяют приёмку конкретного ассета в зафиксированном Godot 4.7.2 Compatibility.

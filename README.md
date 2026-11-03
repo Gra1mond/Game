@@ -2,6 +2,8 @@
 
 Godot 4.7.2 stable (`4.7.2.stable.official.ed1daf0bf`), типизированный GDScript, 2D Compatibility. Целевая платформа — Windows x64. Исходный HTML остаётся отдельным экспериментом.
 
+**Реализовано: T01–T04**, приняты в `dev`. Новая согласованная спецификация сохраняет 2D-мир, добавляет настоящий 3D-инспектор/локальный художественный конвейер и отдельно планирует героев/экипаж/найм M2. Эти модели и механики пока не реализованы. [План и порядок PR](docs/implementation-plan/README.md), [графика](docs/implementation-plan/ART-AND-ASSETS.md), [прогрессия](docs/implementation-plan/CREW-AND-TALENTS.md), [навыки/риски](docs/implementation-plan/SKILLS-RESEARCH.md).
+
 ## Установка и запуск
 
 Скачайте официальный **Godot 4.7.2 stable Standard**, не .NET: [релиз](https://github.com/godotengine/godot/releases/tag/4.7.2-stable). Распакуйте архив для своей ОС; добавьте каталог в PATH или задайте полный путь. Для экспорта нужны **export templates 4.7.2 stable**, установка через Editor → Manage Export Templates. Экспорт и архив Windows относятся к T24.
