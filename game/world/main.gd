@@ -4,8 +4,9 @@ const PortView = preload("res://world/port_view.gd")
 const MapView = preload("res://world/map_view.gd")
 const OilView = preload("res://world/oil_view.gd")
 const QuartzView = preload("res://world/quartz_view.gd")
+const ResearchView = preload("res://world/research_view.gd")
 const COLLECT_COMMAND: Dictionary = {"type": "collect"}
-const PHASE_NAMES: Dictionary = {"idle": "свободен", "outbound": "к обломку", "loading": "погрузка", "returning": "доставка", "operating": "на станции"}
+const PHASE_NAMES: Dictionary = {"idle": "свободен", "outbound": "к обломку", "loading": "погрузка", "returning": "доставка", "operating": "на станции", "research": "исследование"}
 const OIL_PHASE_NAMES: Dictionary = {"pressure": "набор давления", "pumping": "откачка", "cooling": "охлаждение"}
 const OIL_MODE_NAMES: Dictionary = {"steady": "ровный", "overdrive": "форсаж"}
 const QUARTZ_PHASE_NAMES: Dictionary = {"charge": "заряд", "fracture": "раскол", "cooling": "охлаждение"}
@@ -32,6 +33,9 @@ const REASONS: Dictionary = {
 	"unknown_boost_target": "Выберите построенный порт или кварцевый район.",
 	"quartz_locked": "Нужны порт, насос и суммарный выпуск по 8 сплава и масла.",
 	"insufficient_quartz": "Не хватает кварца. Выплата происходит только после раскола.",
+	"insufficient_data": "Не хватает данных. Назначьте одного исследователя на корабль.",
+	"unknown_research": "Выберите доступное исследование.",
+	"research_required": "Сначала изучите автоматизацию во вкладке «Наука».",
 }
 const NETWORK_REASONS: Dictionary = {
 	"working": "Работает — питание выделено полностью.",
@@ -45,6 +49,18 @@ const NETWORK_REASONS: Dictionary = {
 	"no_oil": "Не хватает масла на топливо. Аварийное питание корабля сохраняется.",
 	"starting": "Ожидает следующего такта и резервирования топлива.",
 }
+const LABORATORY_REASONS: Dictionary = {
+	"working": "Исследование идёт",
+	"no_worker": "Нет исследователя — назначьте работника ниже",
+	"returning": "Пост зарезервирован — сборщик сначала доставит груз",
+}
+const AUTOMATION_REASONS: Dictionary = {
+	"research_required": "Закрыто — сначала изучите автоматизацию",
+	"manual_off": "Выключено вручную",
+	"working": "Автоматический разбор работает",
+	"paused": "Пауза — автоматический разбор остановлен",
+}
+const RESOURCE_NAMES: Dictionary = {"data": "данные", "alloy": "сплав", "quartz": "кварц"}
 
 var session := GameSession.new()
 var clock := FixedClock.new()
@@ -57,6 +73,14 @@ var harbor: Control
 var map_view: Control
 var oil_view: Control
 var quartz_view: Control
+var research_view: Control
+var _research_button: Button
+var _research_container: VBoxContainer
+var _research_rows: Dictionary = {}
+var _laboratory_status: Label
+var _laboratory_progress: ProgressBar
+var _automation_enabled: CheckButton
+var _automation_status: Label
 var _quartz_button: Button
 var _build_quartz_button: Button
 var _quartz_select: OptionButton
@@ -160,7 +184,7 @@ func _build_interface() -> void:
 	chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(chart)
-	var navigation := HBoxContainer.new()
+	var navigation := HFlowContainer.new()
 	chart.add_child(navigation)
 	_map_button = _button("Карта", "ShowMap", show_map)
 	navigation.add_child(_map_button)
@@ -170,11 +194,10 @@ func _build_interface() -> void:
 	navigation.add_child(_oil_button)
 	_quartz_button = _button("Кварц", "ShowQuartz", show_quartz)
 	navigation.add_child(_quartz_button)
+	_research_button = _button("Наука", "ShowResearch", show_research)
+	navigation.add_child(_research_button)
 	_aim_button = _button("Луч [Enter]", "AimBeam", func() -> void: dispatch_command({"type": "beam", "target": _selected_region}))
 	navigation.add_child(_aim_button)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	navigation.add_child(spacer)
 	navigation.add_child(_button("−", "ZoomOut", func() -> void: map_view.change_zoom(1.0 / 1.2)))
 	navigation.add_child(_button("+", "ZoomIn", func() -> void: map_view.change_zoom(1.2)))
 	navigation.add_child(_button("Сброс", "ResetMap", func() -> void: map_view.reset_view()))
@@ -207,12 +230,18 @@ func _build_interface() -> void:
 	quartz_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	viewport.add_child(quartz_view)
 	quartz_view.hide()
+	research_view = ResearchView.new()
+	research_view.name = "ResearchView"
+	research_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	viewport.add_child(research_view)
+	research_view.hide()
 	var legend := _wrapped_label()
 	legend.add_theme_font_size_override("font_size", 13)
-	legend.text = "Щелчок / ← → — район · ПКМ / Enter / «Луч сюда» — направить луч\nКолесо / + − — масштаб · перетаскивание / WASD — сдвиг · Home — сброс.\nЗолотой сектор — усиление; зелёные линии — питание. Луч не заменяет реле."
+	legend.text = "Щелчок / ← → — район · корабль — наука · ПКМ / Enter — луч\nКолесо / + − — масштаб · перетаскивание / WASD — сдвиг · Home — сброс.\nЗолотой сектор — усиление; зелёные линии — питание. Луч не заменяет реле и не направляется на корабль."
 	chart.add_child(legend)
 	_sidebar_tabs = TabContainer.new()
 	_sidebar_tabs.name = "SidebarTabs"
+	_sidebar_tabs.get_tab_bar().scrolling_enabled = true
 	_sidebar_tabs.custom_minimum_size.x = 400
 	_sidebar_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(_sidebar_tabs)
@@ -338,6 +367,43 @@ func _build_interface() -> void:
 	quartz_panel.add_child(_quartz_facts)
 	_quartz_lens = _button("", "QuartzLens", func() -> void: dispatch_command({"type": "upgrade", "id": "quartz_lens", "station": _selected_quartz}))
 	quartz_panel.add_child(_quartz_lens)
+	var research_panel := _scroll_tab("Наука")
+	research_panel.add_child(_label("Исследования на корабле", 20))
+	var research_help := _wrapped_label()
+	research_help.text = "Один бортовой пост доступен сразу — город и отдельное питание не нужны. Назначьте исследователя кнопкой «Наука» у работника ниже: пока он здесь, он не добывает другие ресурсы."
+	research_panel.add_child(research_help)
+	_laboratory_status = _wrapped_label()
+	_laboratory_status.name = "LaboratoryStatus"
+	research_panel.add_child(_laboratory_status)
+	_laboratory_progress = ProgressBar.new()
+	_laboratory_progress.name = "LaboratoryProgress"
+	_laboratory_progress.custom_minimum_size.y = 18
+	research_panel.add_child(_laboratory_progress)
+	var laboratory_help := _wrapped_label()
+	laboratory_help.text = "Данные выдаются только за завершённую работу. Пауза сохраняет прогресс; возврат или переназначение исследователя сбрасывает незавершённую работу. Сборщик с грузом сначала доставит его и зарезервирует пост."
+	research_panel.add_child(laboratory_help)
+	research_panel.add_child(HSeparator.new())
+	research_panel.add_child(_label("Исследования текущего цикла", 19))
+	var studies_help := _wrapped_label()
+	studies_help.text = "Исследования действуют до конца цикла и складываются с оборудованием. «Трюм» в порту и отдельные линзы буров во вкладке «Кварц» остаются локальными улучшениями."
+	research_panel.add_child(studies_help)
+	_research_container = VBoxContainer.new()
+	_research_container.name = "ResearchStudies"
+	_research_container.add_theme_constant_override("separation", 10)
+	research_panel.add_child(_research_container)
+	research_panel.add_child(HSeparator.new())
+	research_panel.add_child(_label("Автоматический разбор", 19))
+	_automation_enabled = CheckButton.new()
+	_automation_enabled.name = "AutomationEnabled"
+	_automation_enabled.text = "Автоматически разбирать обломки"
+	_automation_enabled.toggled.connect(func(value: bool) -> void: dispatch_command({"type": "automation", "enabled": value}))
+	research_panel.add_child(_automation_enabled)
+	_automation_status = _wrapped_label()
+	_automation_status.name = "AutomationStatus"
+	research_panel.add_child(_automation_status)
+	var automation_help := _wrapped_label()
+	automation_help.text = "Повторяет бесплатный ручной сбор, не меняет назначения работников. Ручной, удерживаемый и автоматический сбор используют общий интервал — выплаты не складываются. На паузе не работает; дохода вне игры нет. Изучение само по себе не включает разбор."
+	research_panel.add_child(automation_help)
 	layout.add_child(_label("Сборщики — назначения можно свободно менять", 19))
 	var worker_scroll := ScrollContainer.new()
 	worker_scroll.name = "Workers"
@@ -371,11 +437,15 @@ func select_region(region: String) -> bool:
 	_selected_region = region
 	if session.snapshot().derived.beam.targets.has(region):
 		_beam_preview_target = region
-	if _detail_open:
-		if region == "quartz":
-			_sidebar_tabs.current_tab = 4
-		elif region not in ["port", "oil"]:
-			_detail_open = false
+	if region == "ship":
+		_detail_open = true
+		_sidebar_tabs.current_tab = 5
+	elif _detail_open:
+		match region:
+			"port": _sidebar_tabs.current_tab = 0
+			"oil": _sidebar_tabs.current_tab = 3
+			"quartz": _sidebar_tabs.current_tab = 4
+			_: _detail_open = false
 	_refresh()
 	return true
 
@@ -384,6 +454,7 @@ func show_port() -> void:
 	_beam_preview_target = "port"
 	map_view.select_region("port")
 	_detail_open = true
+	_sidebar_tabs.current_tab = 0
 	map_view.hide()
 	oil_view.hide()
 	harbor.show()
@@ -410,6 +481,14 @@ func show_quartz() -> void:
 	_sidebar_tabs.current_tab = 4
 	_refresh()
 
+func show_research() -> void:
+	if not map_view.select_region("ship"):
+		return
+	_selected_region = "ship"
+	_detail_open = true
+	_sidebar_tabs.current_tab = 5
+	_refresh()
+
 func show_map() -> void:
 	_detail_open = false
 	harbor.hide()
@@ -433,8 +512,8 @@ func dispatch_command(command: Dictionary) -> Dictionary:
 	var result: Dictionary = session.dispatch(command)
 	if result.accepted:
 		match command.get("type", ""):
-			"recall": status.text = "Возврат запрошен: погруженный груз будет доставлен один раз."
-			"assign": status.text = "Назначение принято. В пути новая цель начнётся после возвращения."
+			"recall": status.text = "Возврат запрошен: погруженный груз будет доставлен один раз; незавершённое исследование не выдаёт данных."
+			"assign": status.text = "Назначение на корабельный пост принято. Сборщик с грузом сначала доставит его; пост уже зарезервирован." if command.get("station", "") == "research" else "Назначение принято. В пути новая цель начнётся после возвращения."
 			"upgrade":
 				status.text = "Линза установлена для следующего заряда. Текущая работа и охлаждение сохранены." if command.get("id", "") == "quartz_lens" else "Трюм увеличен. Уже погруженный груз не меняется; сравните отдачу маршрутов."
 			"buy_worker": status.text = "Новый сборщик свободен — выберите ему маршрут ниже."
@@ -456,6 +535,8 @@ func dispatch_command(command: Dictionary) -> Dictionary:
 			"mode": status.text = "Режим выбран для следующего цикла. Текущая партия, фаза и нагрев не сбрасываются."
 			"generator": status.text = "Генератор включён: топливо и мощность проверяются на следующем такте." if command.enabled else "Генератор выключен. Аварийное питание корабля остаётся."
 			"oil_boost": status.text = "Масляный форсаж → %s. Ускорение начнётся после оплаты следующего такта; генератор получает топливо первым." % _boost_target_name(str(command.target)) if command.enabled and not str(command.target).is_empty() else "Масляный форсаж выключен."
+			"research": status.text = "Исследование изучено. Эффекты и прогнозы обновлены; автоматический разбор включается отдельно."
+			"automation": status.text = "Автоматический разбор включён. Он делит интервал с ручным сбором и не меняет назначения работников." if command.enabled else "Автоматический разбор выключен. Ручной сбор остаётся доступен."
 			"pause": status.text = "Пауза" if paused else "Экспедиция продолжается."
 			_: status.text = "Сплав получен."
 	else:
@@ -483,17 +564,20 @@ func _refresh() -> void:
 	var state: Dictionary = session.snapshot()
 	var details: Dictionary = state.derived
 	var built: bool = state.run.stations.has("port")
-	resources.text = "Сплав  %.0f     Масло  %.1f     Кварц  %.0f     Выпущено сплава  %.0f     Работников  %d     Питание  %.2f / %.2f" % [state.run.wallet.alloy, state.run.wallet.oil, state.run.wallet.quartz, state.run.lifetime_produced.alloy, state.run.workers.size(), details.power_used, details.power_capacity]
+	resources.text = "Сплав  %.0f     Масло  %.1f     Кварц  %.0f     Данные  %.0f     Выпущено сплава  %.0f     Работников  %d     Питание  %.2f / %.2f" % [state.run.wallet.alloy, state.run.wallet.oil, state.run.wallet.quartz, state.run.wallet.data, state.run.lifetime_produced.alloy, state.run.workers.size(), details.power_used, details.power_capacity]
 	_pause_button.text = "Продолжить [Пробел]" if paused else "Пауза [Пробел]"
 	_map_button.disabled = not _detail_open
 	_port_button.disabled = _detail_open and _selected_region == "port"
 	_oil_button.disabled = not details.regions.oil.discovered or (_detail_open and _selected_region == "oil")
 	_quartz_button.disabled = _detail_open and _selected_region == "quartz"
 	_quartz_button.tooltip_text = "Буры и условия открытия кварца."
+	_research_button.disabled = _detail_open and _selected_region == "ship"
+	_research_button.tooltip_text = "Корабельный исследовательский пост, исследования и автоматический разбор."
 	map_view.visible = not _detail_open
 	harbor.visible = _detail_open and _selected_region == "port"
 	oil_view.visible = _detail_open and _selected_region == "oil"
 	quartz_view.visible = _detail_open and _selected_region == "quartz"
+	research_view.visible = _detail_open and _selected_region == "ship"
 	_build_button.text = "Порт построен" if built else "Построить порт  ·  %.0f сплава" % details.prices.port.alloy
 	_build_button.disabled = built or paused
 	_buy_button.text = "Новый сборщик  ·  %.0f сплава" % details.prices.worker.alloy
@@ -527,6 +611,8 @@ func _refresh() -> void:
 			assignment_text = " · насос: " + str(OIL_PHASE_NAMES.get(details.stations.oil.phase, details.stations.oil.phase))
 		elif worker.assignment == "port":
 			assignment_text = " · " + str(details.routes[worker.target].name)
+		elif worker.assignment == "research":
+			assignment_text = " · корабельный пост"
 		elif details.quartz.station_ids.has(worker.assignment):
 			var drill: Dictionary = details.stations[worker.assignment]
 			assignment_text = " · %s: %s" % [_station_name(worker.assignment), QUARTZ_PHASE_NAMES.get(drill.phase, drill.phase)]
@@ -536,11 +622,15 @@ func _refresh() -> void:
 				queue_text = " → насос после доставки"
 			elif worker.queued_assignment == "port":
 				queue_text = " → " + str(details.routes[worker.queued_target].name) + " после доставки"
+			elif worker.queued_assignment == "research":
+				queue_text = " → наука после доставки · пост зарезервирован"
 			elif details.quartz.station_ids.has(worker.queued_assignment):
 				queue_text = " → %s после доставки" % _station_name(worker.queued_assignment)
 			else:
 				queue_text = " → свободен после возврата"
 		row.summary.text = "%s · %s%s · груз %.0f / %.0f%s" % [id.to_upper(), phase_name, assignment_text, worker.cargo, visual.capacity, queue_text]
+		if worker.assignment == "research":
+			row.summary.text = "%s · %s%s · %.0f%% работы%s" % [id.to_upper(), phase_name, assignment_text, visual.progress * 100.0, queue_text]
 		row.progress.value = visual.progress * 100.0 if worker.phase != "idle" else 0.0
 		row.near.disabled = paused or (worker.assignment == "port" and worker.target == "near" and not worker.recall_pending) or not built
 		row.far.disabled = paused or (worker.assignment == "port" and worker.target == "far" and not worker.recall_pending) or not built
@@ -548,6 +638,22 @@ func _refresh() -> void:
 		var oil_reserved: bool = (not str(oil.assigned_worker).is_empty() and oil.assigned_worker != id) or (not str(oil.pending_worker).is_empty() and oil.pending_worker != id)
 		row.oil.disabled = paused or not oil.built or oil_reserved or worker.assignment == "oil" or worker.queued_assignment == "oil"
 		row.oil.tooltip_text = "Насос: одно место. Назначение в пути начнётся после доставки груза." if not oil_reserved else "Место у насоса занято или зарезервировано другим работником."
+		var laboratory: Dictionary = details.laboratory
+		var research_reserved: bool = (not str(laboratory.assigned_worker).is_empty() and laboratory.assigned_worker != id) or (not str(laboratory.pending_worker).is_empty() and laboratory.pending_worker != id)
+		var researching: bool = str(worker.assignment) == "research"
+		var incoming_researcher: bool = str(worker.queued_assignment) == "research"
+		row.research.text = "Наука · на посту" if researching else ("Наука · после доставки" if incoming_researcher else "Наука")
+		row.research.disabled = paused or research_reserved or researching or incoming_researcher
+		if paused:
+			row.research.tooltip_text = "Игра на паузе."
+		elif researching:
+			row.research.tooltip_text = "Этот работник уже исследует. «Вернуть» освобождает пост и сбрасывает незавершённую работу."
+		elif incoming_researcher:
+			row.research.tooltip_text = "Пост зарезервирован: сначала доставка груза. «Вернуть» отменяет назначение на науку."
+		elif research_reserved:
+			row.research.tooltip_text = "Единственный пост занят или зарезервирован другим работником."
+		else:
+			row.research.tooltip_text = "Один пост на корабле, без внешнего питания. Сборщик с грузом сначала доставит его; место будет зарезервировано."
 		var preferred_drill: String = str(row.drill_target.get_selected_metadata()) if row.drill_target.selected >= 0 else str(worker.assignment)
 		var drill_id := _sync_drill_select(row.drill_target, details.quartz.station_ids, preferred_drill)
 		row.drill_target.disabled = details.quartz.station_ids.is_empty()
@@ -566,6 +672,7 @@ func _refresh() -> void:
 		row.drill.tooltip_text = drill_reason if not drill_reason.is_empty() else "Одно место. Сборщик в пути сначала доставит груз; место у бура будет зарезервировано."
 		row.drill_target.tooltip_text = "Выберите конкретный бур для этого работника." if not drill_id.is_empty() else "Нет построенных буров."
 		row.recall.disabled = paused or worker.assignment.is_empty() or (worker.recall_pending and worker.queued_assignment.is_empty())
+		row.recall.tooltip_text = "Освободить пост без выплаты за незавершённую работу." if researching else ("Отменить назначение на науку; груз будет доставлен." if incoming_researcher else "Вернуть работника; погруженный груз будет доставлен.")
 	map_view.present(state)
 	map_view.select_region(_selected_region)
 	_refresh_region(details)
@@ -573,9 +680,93 @@ func _refresh() -> void:
 	_refresh_beam(details)
 	_refresh_oil(state)
 	_refresh_quartz(state)
+	_refresh_research(state)
 	harbor.present(state)
 	oil_view.present(state)
 	quartz_view.present(state, _selected_quartz)
+	research_view.present(state)
+
+func _refresh_research(state: Dictionary) -> void:
+	var details: Dictionary = state.derived
+	var laboratory: Dictionary = details.laboratory
+	var assigned: String = str(laboratory.assigned_worker)
+	var pending: String = str(laboratory.pending_worker)
+	var staff: String = "Исследователь: нет" if assigned.is_empty() else "На посту: " + assigned.to_upper()
+	if not pending.is_empty():
+		staff += "\nОжидается: %s после доставки · пост зарезервирован" % pending.to_upper()
+	var laboratory_reason: String = "Пауза — работа сохранена" if bool(state.paused) else str(LABORATORY_REASONS.get(laboratory.reason, laboratory.reason))
+	_laboratory_status.text = "%s\n%s\nДанные: %.0f · +%.0f за %.1f с завершённой работы\nПрогресс %.0f%% · осталось %.1f с · текущий выпуск %.2f данных/с" % [
+		laboratory_reason, staff, state.run.wallet.data, laboratory.batch, laboratory.cycle_seconds,
+		float(laboratory.progress) * 100.0, laboratory.remaining_seconds, laboratory.rate,
+	]
+	_laboratory_status.add_theme_color_override("font_color", Color("85c7ae") if bool(laboratory.active) and not bool(state.paused) else Color("f5cb7d"))
+	_laboratory_progress.value = float(laboratory.progress) * 100.0
+	for id: String in details.research:
+		if not _research_rows.has(id):
+			_create_research_row(id)
+		var row: Dictionary = _research_rows[id]
+		var study: Dictionary = details.research[id]
+		var maximum: bool = str(study.reason) == "max_level"
+		row.title.text = "%s · уровень %d / %d" % [study.name, study.level, study.max_level]
+		row.description.text = str(study.description)
+		var current_effect: String = _research_effect(study.current)
+		row.effect.text = "Действует: %s · максимум" % current_effect if maximum else "Сейчас: %s → следующий уровень: %s" % [current_effect, _research_effect(study.next)]
+		var costs: PackedStringArray = []
+		for resource: String in study.cost:
+			costs.append("%s %.0f (есть %.0f)" % [str(RESOURCE_NAMES.get(resource, resource)), study.cost[resource], state.run.wallet[resource]])
+		row.price.text = "Цена: — · максимальный уровень" if maximum else "Цена: " + " · ".join(costs)
+		var reason: String = ""
+		if maximum:
+			reason = "Максимальный уровень — дальнейшая покупка недоступна."
+		elif bool(state.paused):
+			reason = str(REASONS.paused)
+		elif bool(study.can_buy):
+			reason = "Можно изучить. Указанная цена списывается один раз."
+		else:
+			reason = str(REASONS.get(study.reason, study.reason))
+		row.reason.text = reason
+		row.reason.add_theme_color_override("font_color", Color("85c7ae") if bool(study.can_buy) and not bool(state.paused) else Color("f5cb7d"))
+		row.buy.text = "Максимальный уровень" if maximum else "Изучить уровень %d" % (int(study.level) + 1)
+		row.buy.disabled = bool(state.paused) or not bool(study.can_buy)
+		row.buy.tooltip_text = reason
+	var automation: Dictionary = details.automation
+	_automation_enabled.set_pressed_no_signal(bool(automation.enabled))
+	_automation_enabled.disabled = bool(state.paused) or not bool(automation.unlocked)
+	var automation_reason: String = "Пауза — автоматический разбор остановлен" if bool(state.paused) else str(AUTOMATION_REASONS.get(automation.reason, automation.reason))
+	_automation_enabled.tooltip_text = str(REASONS.research_required) if not bool(automation.unlocked) else automation_reason
+	_automation_status.text = "%s\nФактический выпуск %.2f сплава/с\nОбщий интервал %.1f с · до следующего сбора %.1f с" % [
+		automation_reason, automation.rate, automation.interval_seconds, automation.cooldown_seconds,
+	]
+	_automation_status.add_theme_color_override("font_color", Color("85c7ae") if bool(automation.active) and not bool(state.paused) else Color("f5cb7d"))
+
+func _create_research_row(id: String) -> void:
+	var box := VBoxContainer.new()
+	box.name = "Research_" + id
+	box.add_theme_constant_override("separation", 6)
+	_research_container.add_child(box)
+	var title := _wrapped_label()
+	title.name = "ResearchTitle"
+	title.add_theme_font_size_override("font_size", 17)
+	box.add_child(title)
+	var description := _wrapped_label()
+	description.name = "ResearchDescription"
+	box.add_child(description)
+	var effect := _wrapped_label()
+	effect.name = "ResearchEffect"
+	box.add_child(effect)
+	var price := _wrapped_label()
+	price.name = "ResearchCost"
+	box.add_child(price)
+	var reason := _wrapped_label()
+	reason.name = "ResearchReason"
+	box.add_child(reason)
+	var buy := _button("", "BuyResearch_" + id, func() -> void: dispatch_command({"type": "research", "id": id}))
+	box.add_child(buy)
+	box.add_child(HSeparator.new())
+	_research_rows[id] = {"title": title, "description": description, "effect": effect, "price": price, "reason": reason, "buy": buy}
+
+func _research_effect(effect: Dictionary) -> String:
+	return "%.2f %s" % [effect.value, effect.unit]
 
 func _refresh_region(details: Dictionary) -> void:
 	var ids: Array[String] = []
@@ -590,7 +781,7 @@ func _refresh_region(details: Dictionary) -> void:
 	_region_select.select(ids.find(_selected_region))
 	var region: Dictionary = details.regions[_selected_region]
 	if _selected_region == "ship":
-		_region_label.text = "Корабль — источник аварийного питания.\nРадиус связи: %.0f. Доступная мощность: %.2f." % [details.range, details.power_capacity]
+		_region_label.text = "Корабль — источник аварийного питания и один исследовательский пост.\nНаука доступна до города и не требует внешнего питания. Луч сюда не направляется.\nРадиус связи: %.0f. Доступная мощность: %.2f." % [details.range, details.power_capacity]
 		_relay_button.text = "Источник сети — реле не требуется"
 		_relay_button.disabled = true
 		return
@@ -610,6 +801,7 @@ func _refresh_beam(details: Dictionary) -> void:
 	var beam: Dictionary = details.beam
 	_beam_caption.text = "Главный луч: без усиления" if str(beam.target).is_empty() else "Главный луч → " + str(details.regions[beam.target].name)
 	_aim_button.disabled = paused or not beam.targets.has(_selected_region)
+	_aim_button.tooltip_text = "Корабль — дом и исследовательский пост, не цель луча." if _selected_region == "ship" else "Усилить выбранный открытый район. Питание по реле требуется отдельно."
 	if _beam_select.item_count != beam.targets.size() + 1:
 		_beam_select.clear()
 		_beam_select.add_item("Без усиления")
@@ -685,7 +877,7 @@ func _refresh_oil(state: Dictionary) -> void:
 		ContentCatalog.OIL_PRESSURE_SECONDS,
 		ContentCatalog.OIL_BATCH, ContentCatalog.OIL_PUMP_SECONDS, ContentCatalog.OIL_STEADY_COOLING_RATE,
 		ContentCatalog.OIL_OVERDRIVE_BATCH, ContentCatalog.OIL_OVERDRIVE_PUMP_SECONDS,
-		ContentCatalog.OIL_HEAT_PER_BATCH, ContentCatalog.OIL_HEAT_LIMIT, ContentCatalog.OIL_COOLING_RATE,
+		ContentCatalog.OIL_HEAT_PER_BATCH, ContentCatalog.OIL_HEAT_LIMIT, oil.cooling_rate,
 	]
 	var fuel_time := "Нет расхода — запас не убывает от топлива."
 	if details.oil_seconds >= 0.0:
@@ -817,6 +1009,7 @@ func _create_worker_row(id: String) -> void:
 	box.name = id
 	_workers_container.add_child(box)
 	var summary := _wrapped_label()
+	summary.name = "WorkerSummary"
 	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(summary)
 	var row := HFlowContainer.new()
@@ -835,13 +1028,16 @@ func _create_worker_row(id: String) -> void:
 	var drill := _button("На бур", "Drill", func() -> void:
 		dispatch_command({"type": "assign", "worker": id, "station": str(drill_target.get_selected_metadata())}))
 	row.add_child(drill)
+	var research := _button("Наука", "Research", func() -> void: dispatch_command({"type": "assign", "worker": id, "station": "research"}))
+	row.add_child(research)
 	var recall := _button("Вернуть", "Recall", func() -> void: dispatch_command({"type": "recall", "worker": id}))
 	row.add_child(recall)
 	var progress := ProgressBar.new()
+	progress.name = "WorkerProgress"
 	progress.custom_minimum_size.y = 5
 	progress.show_percentage = false
 	box.add_child(progress)
-	_worker_rows[id] = {"summary": summary, "progress": progress, "near": near, "far": far, "oil": oil, "drill_target": drill_target, "drill": drill, "recall": recall}
+	_worker_rows[id] = {"summary": summary, "progress": progress, "near": near, "far": far, "oil": oil, "drill_target": drill_target, "drill": drill, "research": research, "recall": recall}
 
 func _refresh_quartz(state: Dictionary) -> void:
 	var details: Dictionary = state.derived

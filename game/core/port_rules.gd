@@ -4,13 +4,14 @@ extends RefCounted
 static func advance(run: Dictionary, delta: float, oil_bonus: float) -> float:
 	var delivered := 0.0
 	var port_loading_speed: float = loading_speed(run, oil_bonus)
+	var travel_speed: float = ContentCatalog.research_effect(run, "optics")
 	for worker_id: String in run.workers:
 		var worker: Dictionary = run.workers[worker_id]
 		if worker.assignment != "port":
 			continue
 		var route: Dictionary = ContentCatalog.PORT_ROUTES[worker.target]
 		var duration: float = route.loading_seconds if worker.phase == "loading" else route.travel_seconds
-		var speed: float = port_loading_speed if worker.phase == "loading" else 1.0
+		var speed: float = port_loading_speed if worker.phase == "loading" else travel_speed
 		worker.phase_progress += delta * speed
 		if worker.phase_progress + 0.00000001 < duration:
 			continue
@@ -23,14 +24,16 @@ static func advance(run: Dictionary, delta: float, oil_bonus: float) -> float:
 			"loading":
 				worker.cargo = minf(capacity(run), route.cargo_limit)
 				worker.phase = "returning"
+				worker.phase_progress *= travel_speed
 			"returning":
 				delivered += float(worker.cargo)
 				worker.cargo = 0.0
 				worker.phase = "outbound"
+				worker.phase_progress *= travel_speed
 				if worker.recall_pending:
 					worker.assignment = worker.queued_assignment
 					worker.target = worker.queued_target
-					worker.phase = "idle" if worker.assignment.is_empty() else ("outbound" if worker.assignment == "port" else "operating")
+					worker.phase = "idle" if worker.assignment.is_empty() else ("research" if worker.assignment == "research" else ("outbound" if worker.assignment == "port" else "operating"))
 					worker.phase_progress = 0.0
 					worker.recall_pending = false
 					worker.queued_assignment = ""
@@ -46,17 +49,20 @@ static func recall(worker: Dictionary) -> void:
 	worker.phase = "returning"
 
 static func capacity(run: Dictionary) -> float:
-	return ContentCatalog.CARGO_HOLD_CAPACITY if run.upgrades.get("cargo_hold", 0) > 0 else ContentCatalog.WORKER_CAPACITY
+	var base: float = ContentCatalog.CARGO_HOLD_CAPACITY if run.upgrades.get("cargo_hold", 0) > 0 else ContentCatalog.WORKER_CAPACITY
+	return base + ContentCatalog.research_effect(run, "capacity")
 
 static func loading_speed(run: Dictionary, oil_bonus: float) -> float:
 	return (ContentCatalog.PORT_BEAM_LOADING_SPEED if run.beam_target == "port" else 1.0) + oil_bonus
 
 static func describe(run: Dictionary, oil_bonus: float) -> Dictionary:
 	var hold_capacity: float = capacity(run)
+	var upgraded_capacity: float = ContentCatalog.CARGO_HOLD_CAPACITY + ContentCatalog.research_effect(run, "capacity")
 	var speed: float = loading_speed(run, oil_bonus)
+	var travel_speed: float = ContentCatalog.research_effect(run, "optics")
 	var routes: Dictionary = {}
 	for target: String in ContentCatalog.PORT_ROUTES:
-		routes[target] = route_details(target, hold_capacity, speed)
+		routes[target] = route_details(target, hold_capacity, speed, travel_speed)
 	var workers: Dictionary = {}
 	var total_rate := 0.0
 	var assigned := 0
@@ -64,7 +70,7 @@ static func describe(run: Dictionary, oil_bonus: float) -> Dictionary:
 		var worker: Dictionary = run.workers[id]
 		var route: Dictionary = routes[worker.target]
 		var duration: float = route.loading_seconds if worker.phase == "loading" else route.travel_seconds
-		var work: float = ContentCatalog.PORT_ROUTES[worker.target].loading_seconds if worker.phase == "loading" else duration
+		var work: float = ContentCatalog.PORT_ROUTES[worker.target].loading_seconds if worker.phase == "loading" else ContentCatalog.PORT_ROUTES[worker.target].travel_seconds
 		workers[id] = {
 			"progress": clampf(float(worker.phase_progress) / work, 0.0, 1.0),
 			"phase_seconds": duration, "capacity": hold_capacity, "routes": routes,
@@ -77,22 +83,23 @@ static func describe(run: Dictionary, oil_bonus: float) -> Dictionary:
 	return {
 		"workers": workers, "routes": routes, "capacity": hold_capacity,
 		"upgraded_routes": {
-			"near": route_details("near", ContentCatalog.CARGO_HOLD_CAPACITY, speed),
-			"far": route_details("far", ContentCatalog.CARGO_HOLD_CAPACITY, speed),
+			"near": route_details("near", upgraded_capacity, speed, travel_speed),
+			"far": route_details("far", upgraded_capacity, speed, travel_speed),
 		},
 		"stations": {"port": {"built": built, "reason": "not_built" if not built else ("working" if assigned > 0 else "no_worker"),
 			"active": built and assigned > 0, "rate": total_rate, "assigned_workers": assigned}},
 		"prices": {"port": {"alloy": ContentCatalog.station_price(run, "port")}, "worker": {"alloy": ContentCatalog.worker_price(run.workers.size())}},
 		"upgrades": {"cargo_hold": {"level": run.upgrades.get("cargo_hold", 0), "max_level": 1,
-			"cost": {"alloy": ContentCatalog.CARGO_HOLD_PRICE}, "next_capacity": ContentCatalog.CARGO_HOLD_CAPACITY}},
+			"cost": {"alloy": ContentCatalog.CARGO_HOLD_PRICE}, "next_capacity": upgraded_capacity}},
 	}
 
-static func route_details(target: String, hold_capacity: float, speed: float) -> Dictionary:
+static func route_details(target: String, hold_capacity: float, speed: float, travel_speed: float) -> Dictionary:
 	var base: Dictionary = ContentCatalog.PORT_ROUTES[target]
 	var cargo: float = minf(hold_capacity, float(base.cargo_limit))
 	var loading: float = float(base.loading_seconds) / speed
-	var cycle: float = float(base.travel_seconds) * 2.0 + loading
+	var travel: float = float(base.travel_seconds) / travel_speed
+	var cycle: float = travel * 2.0 + loading
 	return {
-		"name": base.name, "cargo": cargo, "travel_seconds": base.travel_seconds,
+		"name": base.name, "cargo": cargo, "travel_seconds": travel,
 		"loading_seconds": loading, "cycle_seconds": cycle, "rate": cargo / cycle,
 	}
