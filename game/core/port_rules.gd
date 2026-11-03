@@ -1,9 +1,9 @@
 class_name PortRules
 extends RefCounted
 
-static func advance(run: Dictionary, delta: float) -> float:
+static func advance(run: Dictionary, delta: float, oil_bonus: float) -> float:
 	var delivered := 0.0
-	var port_loading_speed: float = loading_speed(run)
+	var port_loading_speed: float = loading_speed(run, oil_bonus)
 	for worker_id: String in run.workers:
 		var worker: Dictionary = run.workers[worker_id]
 		if worker.assignment != "port":
@@ -30,7 +30,7 @@ static func advance(run: Dictionary, delta: float) -> float:
 				if worker.recall_pending:
 					worker.assignment = worker.queued_assignment
 					worker.target = worker.queued_target
-					worker.phase = "idle" if worker.assignment.is_empty() else "outbound"
+					worker.phase = "idle" if worker.assignment.is_empty() else ("operating" if worker.assignment == "oil" else "outbound")
 					worker.phase_progress = 0.0
 					worker.recall_pending = false
 					worker.queued_assignment = ""
@@ -48,12 +48,12 @@ static func recall(worker: Dictionary) -> void:
 static func capacity(run: Dictionary) -> float:
 	return ContentCatalog.CARGO_HOLD_CAPACITY if run.upgrades.get("cargo_hold", 0) > 0 else ContentCatalog.WORKER_CAPACITY
 
-static func loading_speed(run: Dictionary) -> float:
-	return ContentCatalog.PORT_BEAM_LOADING_SPEED if run.beam_target == "port" else 1.0
+static func loading_speed(run: Dictionary, oil_bonus: float) -> float:
+	return (ContentCatalog.PORT_BEAM_LOADING_SPEED if run.beam_target == "port" else 1.0) + oil_bonus
 
-static func describe(run: Dictionary) -> Dictionary:
+static func describe(run: Dictionary, oil_bonus: float) -> Dictionary:
 	var hold_capacity: float = capacity(run)
-	var speed: float = loading_speed(run)
+	var speed: float = loading_speed(run, oil_bonus)
 	var routes: Dictionary = {}
 	for target: String in ContentCatalog.PORT_ROUTES:
 		routes[target] = route_details(target, hold_capacity, speed)
@@ -80,9 +80,9 @@ static func describe(run: Dictionary) -> Dictionary:
 			"near": route_details("near", ContentCatalog.CARGO_HOLD_CAPACITY, speed),
 			"far": route_details("far", ContentCatalog.CARGO_HOLD_CAPACITY, speed),
 		},
-		"stations": {"port": {"reason": "not_built" if not built else ("working" if assigned > 0 else "no_worker"),
+		"stations": {"port": {"built": built, "reason": "not_built" if not built else ("working" if assigned > 0 else "no_worker"),
 			"active": built and assigned > 0, "rate": total_rate, "assigned_workers": assigned}},
-		"prices": {"port": {"alloy": ContentCatalog.port_price(run)}, "worker": {"alloy": ContentCatalog.worker_price(run.workers.size())}},
+		"prices": {"port": {"alloy": ContentCatalog.station_price(run, "port")}, "worker": {"alloy": ContentCatalog.worker_price(run.workers.size())}},
 		"upgrades": {"cargo_hold": {"level": run.upgrades.get("cargo_hold", 0), "max_level": 1,
 			"cost": {"alloy": ContentCatalog.CARGO_HOLD_PRICE}, "next_capacity": ContentCatalog.CARGO_HOLD_CAPACITY}},
 	}

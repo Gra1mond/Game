@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | SaveEnvelope | schema_version, content_version, revision, profile_id | Файл целиком |
 | ProfileState | total_echo, allocation, claimed_milestone_ids, discovered_locations, story_flags, cycle_index | Между экспедициями |
-| RunState | run_id, seed, tick, wallet, lifetime_produced, stations, relays, workers, upgrades, goals, finds, project_stages, beam_target, oil_boost_target, oil_boost_enabled | Текущий цикл |
-| StationState | id, built, enabled, assigned_workers, power_request, priority, mode, phase, phase_progress, pending_output | Текущий цикл |
+| RunState | run_id, seed, tick, wallet, lifetime_produced, stations, relays, workers, upgrades, goals, finds, project_stages, beam_target, generator_built, generator_enabled, oil_boost_target, oil_boost_enabled | Текущий цикл |
+| StationState | id, kind, region, enabled, power_request, priority; mode, cycle_mode, phase, phase_progress, heat для oil | Текущий цикл |
 | WorkerState | id, assignment, target, phase, phase_progress, cargo, recall_pending, queued_assignment, queued_target; expedition_target по мере появления находок | Текущий цикл |
 | Settings | volume, text_scale, effects, input_settings, automation_preferences | Отдельно от игрового профиля |
 
@@ -22,6 +22,10 @@ T04: `run.relays` по умолчанию `{}`, ключи port/oil/quartz/coast
 `GameSession._network` — пересчитываемый кэш, НЕ поле профиля и НЕ сохраняется. Содержит регионы, фактические связи и выделенную мощность; после будущей загрузки пересчитать из relays/stations/discovered_locations. Пока формат сохранения не выпущен (T10), миграция файлов не объявляется выполненной.
 
 T05: `run.beam_target` действует: default `""`, открытые port/oil/quartz. T10 восстанавливает его вместе с фазами/грузом без повторной команды. Погрузочный phase_progress — выполненная работа в базовых секундах, путевой — обычные секунды. Переключение не меняет работу; derived.workers.progress нормирован по базовому объёму, phase_seconds — реальная полная длительность с текущим бонусом. Derived.beam/прогнозы/черновик UI не сохраняются.
+
+T06: `stations.oil` появляется после покупки: id/kind/region=oil, enabled=true, power_request=0.75,priority=0, mode=steady, cycle_mode="", phase=pressure, phase_progress=0,heat=0. Фазы pressure/pumping/cooling; `cycle_mode` фиксирует уже начатую партию, `mode` — следующий выбор. Давление хранит базовую работу, откачка/охлаждение — секунды. Выпуск зачисляется только при завершении откачки, промежуточная партия не хранится вторым ресурсом. Назначение насоса — `workers[id].assignment="oil",phase="operating"`; очередь использует существующие queued_assignment/queued_target. target остаётся допустимым near/far и на насосе.
+
+`generator_built/generator_enabled` по умолчанию false; `oil_boost_target=""`, `oil_boost_enabled=false`. В T10 эти флаги, тепло, работа и зафиксированный режим партии восстанавливаются вместе с рабочими, без повторной покупки/выплаты. Фактические `_generator_active/_boost_active`, причина форсажа, сетевой кэш и все derived — пересчитываемые runtime-данные, не дополнительные сохраняемые флаги. Топливо резервируется реальным шагом, не snapshot/загрузкой. Файловые сохранения пока не реализованы.
 
 ### Планируемое расширение M2
 

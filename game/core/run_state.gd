@@ -14,7 +14,7 @@ static func create(seed_value: int, cycle: int = 0) -> Dictionary:
 		"stations": {}, "workers": {"w1": create_worker("w1")}, "upgrades": {}, "goals": {},
 		"finds": {}, "project_stages": {}, "beam_target": "",
 		"oil_boost_target": "", "oil_boost_enabled": false,
-		"generator_enabled": false, "relays": {},
+		"generator_built": false, "generator_enabled": false, "relays": {},
 	}
 
 static func create_worker(id: String) -> Dictionary:
