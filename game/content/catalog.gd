@@ -7,7 +7,23 @@ const MAX_CATCHUP_STEPS: int = 10
 const BACKGROUND_SECONDS: float = 2.0
 const RESOURCES: Array[String] = ["alloy", "oil", "quartz", "biomass", "data", "resonance"]
 
-const PORT_PRICE: float = 20.0
+const STATION_PRICES: Dictionary = {"port": 20.0, "oil": 20.0}
+const OIL_POWER: float = 0.75
+const OIL_PRESSURE_SECONDS: float = 2.0
+const OIL_PUMP_SECONDS: float = 2.0
+const OIL_BATCH: float = 4.0
+const OIL_OVERDRIVE_PUMP_SECONDS: float = 1.0
+const OIL_OVERDRIVE_BATCH: float = 6.0
+const OIL_HEAT_PER_BATCH: float = 20.0
+const OIL_HEAT_LIMIT: float = 60.0
+const OIL_COOLING_RATE: float = 10.0
+const OIL_STEADY_COOLING_RATE: float = 5.0
+const OIL_BEAM_PRESSURE_SPEED: float = 2.0
+const GENERATOR_PRICE: float = 12.0
+const GENERATOR_CAPACITY: float = 2.0
+const GENERATOR_OIL_PER_SECOND: float = 0.5
+const OIL_BOOST_PER_SECOND: float = 0.5
+const OIL_BOOST_BONUS: float = 0.5
 const WORKER_CAPACITY: float = 4.0
 const PORT_ROUTES: Dictionary = {
 	"near": {"name": "Ближний обломок", "travel_seconds": 2.0, "loading_seconds": 1.0, "cargo_limit": 4.0},
@@ -40,8 +56,8 @@ const REGIONS: Dictionary = {
 }
 const RELAY_PRICES: Dictionary = {"port": 10.0, "oil": 10.0, "quartz": 12.0, "coastal": 16.0}
 
-static func port_price(run: Dictionary) -> float:
-	return PORT_PRICE - (float(RELAY_PRICES.port) if run.relays.has("port") else 0.0)
+static func station_price(run: Dictionary, region: String) -> float:
+	return float(STATION_PRICES[region]) - (float(RELAY_PRICES[region]) if run.relays.has(region) else 0.0)
 
 static func worker_price(worker_count: int) -> float:
 	return ceilf(WORKER_BASE_PRICE * pow(WORKER_PRICE_GROWTH, maxi(0, worker_count - 1)))

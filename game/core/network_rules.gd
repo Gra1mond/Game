@@ -16,7 +16,7 @@ static func evaluate(run: Dictionary, discovered: Array, capacity: float = Conte
 	for id: String in stations:
 		var station: Dictionary = stations[id]
 		var region: String = station.get("region", id)
-		consumers[id] = _consumer(id, "station", region, station, ContentCatalog.PORT_POWER, 0)
+		consumers[id] = _consumer(id, "station", region, station, ContentCatalog.OIL_POWER if station.kind == "oil" else ContentCatalog.PORT_POWER, 0)
 
 	var consumer_ids: Array[String] = []
 	for id: String in consumers:
